@@ -624,7 +624,8 @@ void CGitLogListBase::DrawTagBranchMessage(HDC hdc, CRect &rect, INT_PTR index, 
 		DrawTagBranch(hdc, W_Dc, hTheme, rect, rt, rItem, data, refList);
 		rt.left += oneSpaceSize.cx;
 	}
-
+	
+	CString msg = MessageDisplayStr(data);
 	int action = data->GetRebaseAction();
 	bool skip = !!(action & (LOGACTIONS_REBASE_DONE | LOGACTIONS_REBASE_SKIP));
 	if (IsAppThemed() && pfnDrawThemeTextEx)
@@ -637,20 +638,20 @@ void CGitLogListBase::DrawTagBranchMessage(HDC hdc, CRect &rect, INT_PTR index, 
 		opts.dwSize = sizeof(opts);
 		opts.crText = skip ? RGB(128,128,128) : ::GetSysColor(COLOR_WINDOWTEXT);
 		opts.dwFlags = DTT_TEXTCOLOR;
-		pfnDrawThemeTextEx(hTheme, hdc, LVP_LISTITEM, txtState, data->GetSubject(), -1, DT_NOPREFIX | DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS, &rt, &opts);
+		pfnDrawThemeTextEx(hTheme, hdc, LVP_LISTITEM, txtState, msg, -1, DT_NOPREFIX | DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS, &rt, &opts);
 	}
 	else
 	{
 		if (rItem.state & LVIS_SELECTED)
 		{
 			COLORREF clrOld = ::SetTextColor(hdc, skip ? RGB(128,128,128) : ::GetSysColor(COLOR_HIGHLIGHTTEXT));
-			::DrawText(hdc,data->GetSubject(), data->GetSubject().GetLength(), &rt, DT_NOPREFIX | DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+			::DrawText(hdc, msg, msg.GetLength(), &rt, DT_NOPREFIX | DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
 			::SetTextColor(hdc, clrOld);
 		}
 		else
 		{
 			COLORREF clrOld = ::SetTextColor(hdc, skip ? RGB(128,128,128) : ::GetSysColor(COLOR_WINDOWTEXT));
-			::DrawText(hdc, data->GetSubject(), data->GetSubject().GetLength(), &rt, DT_NOPREFIX | DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+			::DrawText(hdc, msg, msg.GetLength(), &rt, DT_NOPREFIX | DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
 			::SetTextColor(hdc, clrOld);
 		}
 	}
@@ -658,7 +659,7 @@ void CGitLogListBase::DrawTagBranchMessage(HDC hdc, CRect &rect, INT_PTR index, 
 	if (m_bTagsBranchesOnRightSide)
 	{
 		SIZE size;
-		GetTextExtentPoint32(hdc, data->GetSubject(), data->GetSubject().GetLength(), &size);
+		GetTextExtentPoint32(hdc, msg, msg.GetLength(), &size);
 
 		rt.left += oneSpaceSize.cx + size.cx;
 
@@ -1577,6 +1578,14 @@ CString FindSVNRev(const CString& msg)
 	return _T("");
 }
 
+CString CGitLogListBase::MessageDisplayStr(GitRev * pLogEntry)
+{
+	CString txt = pLogEntry->GetSubject();
+	txt.Append(_T("  --  "));
+	txt.Append(pLogEntry->GetBody());
+	return txt;
+}
+
 // CGitLogListBase message handlers
 
 void CGitLogListBase::OnLvnGetdispinfoLoglist(NMHDR *pNMHDR, LRESULT *pResult)
@@ -1622,24 +1631,27 @@ void CGitLogListBase::OnLvnGetdispinfoLoglist(NMHDR *pNMHDR, LRESULT *pResult)
 	case this->LOGLIST_GRAPH:	//Graphic
 		break;
 	case this->LOGLIST_REBASE:
-		{
-			if (this->m_IsRebaseReplaceGraph && pLogEntry)
-				lstrcpyn(pItem->pszText, GetRebaseActionName(pLogEntry->GetRebaseAction() & LOGACTIONS_REBASE_MODE_MASK), pItem->cchTextMax);
-		}
+	{
+								 if (this->m_IsRebaseReplaceGraph && pLogEntry)
+									 lstrcpyn(pItem->pszText, GetRebaseActionName(pLogEntry->GetRebaseAction() & LOGACTIONS_REBASE_MODE_MASK), pItem->cchTextMax);
+	}
 		break;
 	case this->LOGLIST_ACTION: //action -- no text in the column
 		break;
 	case this->LOGLIST_HASH:
-		if(pLogEntry)
+		if (pLogEntry)
 			lstrcpyn(pItem->pszText, pLogEntry->m_CommitHash.ToString(), pItem->cchTextMax);
 		break;
 	case this->LOGLIST_ID:
-		if(this->m_IsIDReplaceAction)
+		if (this->m_IsIDReplaceAction)
 			lstrcpyn(pItem->pszText, temp, pItem->cchTextMax);
 		break;
 	case this->LOGLIST_MESSAGE: //Message
 		if (pLogEntry)
-			lstrcpyn(pItem->pszText, (LPCTSTR)pLogEntry->GetSubject(), pItem->cchTextMax);
+		{
+			CString txt = MessageDisplayStr(pLogEntry);
+			lstrcpyn(pItem->pszText, (LPCTSTR)MessageDisplayStr(pLogEntry), pItem->cchTextMax);
+		}
 		break;
 	case this->LOGLIST_AUTHOR: //Author
 		if (pLogEntry)
