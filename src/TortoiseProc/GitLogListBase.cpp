@@ -1581,8 +1581,14 @@ CString FindSVNRev(const CString& msg)
 CString CGitLogListBase::MessageDisplayStr(GitRev * pLogEntry)
 {
 	CString txt = pLogEntry->GetSubject();
-	txt.Append(_T("  --  "));
-	txt.Append(pLogEntry->GetBody());
+	if (pLogEntry->GetBody().GetLength() > 0)
+	{
+		txt.Append(_T("  ->  "));
+		txt.Append(pLogEntry->GetBody());
+	}
+	//Deal with CRLF
+	txt.Replace(_T("\n"), _T(" "));
+	txt.Replace(_T("\r"), _T(" "));
 	return txt;
 }
 
