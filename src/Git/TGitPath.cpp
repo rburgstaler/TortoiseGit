@@ -765,7 +765,7 @@ int CTGitPath::GetAdminDirMask() const
 	}
 
 	CString dotGitPath;
-	GitAdminDir::GetAdminDirPath(topdir, dotGitPath);
+	GitAdminDir::GetWorktreeAdminDirPath(topdir, dotGitPath);
 
 	if (PathFileExists(dotGitPath + _T("BISECT_START")))
 		status |= ITEMIS_BISECT;
@@ -773,6 +773,8 @@ int CTGitPath::GetAdminDirMask() const
 	if (PathFileExists(dotGitPath + _T("MERGE_HEAD")))
 		status |= ITEMIS_MERGEACTIVE;
 
+	dotGitPath.Empty();
+	GitAdminDir::GetAdminDirPath(topdir, dotGitPath);
 	if (PathFileExists(dotGitPath + _T("refs\\stash")))
 		status |= ITEMIS_STASH;
 
@@ -879,7 +881,7 @@ bool CTGitPath::IsBisectActive() const
 		return false;
 
 	CString dotGitPath;
-	GitAdminDir::GetAdminDirPath(topdir, dotGitPath);
+	GitAdminDir::GetWorktreeAdminDirPath(topdir, dotGitPath);
 
 	return !!PathFileExists(dotGitPath + _T("BISECT_START"));
 }
@@ -890,7 +892,7 @@ bool CTGitPath::IsMergeActive() const
 		return false;
 
 	CString dotGitPath;
-	GitAdminDir::GetAdminDirPath(topdir, dotGitPath);
+	GitAdminDir::GetWorktreeAdminDirPath(topdir, dotGitPath);
 
 	return !!PathFileExists(dotGitPath + _T("MERGE_HEAD"));
 }
@@ -901,7 +903,7 @@ bool CTGitPath::HasRebaseApply() const
 		return false;
 
 	CString dotGitPath;
-	GitAdminDir::GetAdminDirPath(topdir, dotGitPath);
+	GitAdminDir::GetWorktreeAdminDirPath(topdir, dotGitPath);
 
 	return !!PathFileExists(dotGitPath + _T("rebase-apply"));
 }
