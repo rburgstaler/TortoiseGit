@@ -75,18 +75,18 @@ static bool SortTree(const CGitTreeItem &Item1, const CGitTreeItem &Item2)
 	return Item1.m_FileName.Compare(Item2.m_FileName) < 0;
 }
 
-int CGitIndexList::ReadIndex(CString dgitdir)
+int CGitIndexList::ReadIndex(CString gitdir)
 {
 	this->clear();
 
 	CAutoLocker lock(m_critRepoSec);
-	if (repository.Open(dgitdir))
+	if (repository.Open(gitdir))
 		return -1;
 
 	// add config files
 	CAutoConfig config(true);
 
-	CString projectConfig = dgitdir + _T("config");
+	CString projectConfig = g_AdminDirMap.GetAdminDir(gitdir) + _T("config");
 	CString globalConfig = g_Git.GetGitGlobalConfig();
 	CString globalXDGConfig = g_Git.GetGitGlobalXDGConfig();
 	CString systemConfig(CRegString(REG_SYSTEM_GITCONFIGPATH, _T(""), FALSE));
@@ -128,7 +128,7 @@ int CGitIndexList::ReadIndex(CString dgitdir)
 		m_bHasConflicts |= GIT_IDXENTRY_STAGE(e);
 	}
 
-	CGit::GetFileModifyTime(dgitdir + _T("index"), &this->m_LastModifyTime);
+	CGit::GetFileModifyTime(g_AdminDirMap.GetWorktreeAdminDir(gitdir) + _T("index"), &this->m_LastModifyTime);
 	std::sort(this->begin(), this->end(), SortIndex);
 
 	return 0;
@@ -295,7 +295,7 @@ int CGitIndexFileMap::Check(const CString &gitdir, bool *isChanged)
 {
 	__int64 time;
 
-	CString IndexFile = g_AdminDirMap.GetAdminDirConcat(gitdir, _T("index"));
+	CString IndexFile = g_AdminDirMap.GetWorktreeAdminDirConcat(gitdir, _T("index"));
 
 	if (CGit::GetFileModifyTime(IndexFile, &time))
 		return -1;
@@ -327,7 +327,7 @@ int CGitIndexFileMap::LoadIndex(const CString &gitdir)
 {
 	SHARED_INDEX_PTR pIndex(new CGitIndexList);
 
-	if (pIndex->ReadIndex(g_AdminDirMap.GetAdminDir(gitdir)))
+	if (pIndex->ReadIndex(gitdir))
 		return -1;
 
 	this->SafeSet(gitdir, pIndex);
@@ -481,7 +481,7 @@ int CGitHeadFileList::GetPackRef(const CString &gitdir)
 int CGitHeadFileList::ReadHeadHash(const CString& gitdir)
 {
 	CAutoWriteLock lock(m_SharedMutex);
-	m_Gitdir = g_AdminDirMap.GetAdminDir(gitdir);
+	m_Gitdir = g_AdminDirMap.GetWorktreeAdminDir(gitdir);
 
 	m_HeadFile = m_Gitdir;
 	m_HeadFile += _T("HEAD");
@@ -524,7 +524,7 @@ int CGitHeadFileList::ReadHeadHash(const CString& gitdir)
 		CString ref = m_HeadRefFile.Trim();
 		int start = 0;
 		ref = ref.Tokenize(_T("\n"), start);
-		m_HeadRefFile = m_Gitdir + m_HeadRefFile;
+		m_HeadRefFile = g_AdminDirMap.GetAdminDir(gitdir) + m_HeadRefFile;
 		m_HeadRefFile.Replace(_T('/'), _T('\\'));
 
 		__int64 time;
