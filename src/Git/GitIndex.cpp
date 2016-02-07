@@ -373,6 +373,7 @@ int CGitIndexFileMap::IsUnderVersionControl(const CString& gitdir, CString subpa
 int CGitHeadFileList::GetPackRef(const CString &gitdir)
 {
 	CString PackRef = g_AdminDirMap.GetAdminDirConcat(gitdir, _T("packed-refs"));
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": PackRef %s"), (LPCTSTR)PackRef);
 
 	__int64 mtime;
 	if (CGit::GetFileModifyTime(PackRef, &mtime))
@@ -475,6 +476,7 @@ int CGitHeadFileList::ReadHeadHash(const CString& gitdir)
 	if( CGit::GetFileModifyTime(m_HeadFile, &m_LastModifyTimeHead))
 		return -1;
 
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Analyzing file %s"), (LPCTSTR)m_HeadFile);
 	CAutoFile hfile = CreateFile(m_HeadFile,
 		GENERIC_READ,
 		FILE_SHARE_READ | FILE_SHARE_DELETE | FILE_SHARE_WRITE,
@@ -484,7 +486,10 @@ int CGitHeadFileList::ReadHeadHash(const CString& gitdir)
 		nullptr);
 
 	if (!hfile)
+	{
+		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": FAIL!!!! %s"), (LPCTSTR)m_HeadFile);
 		return -1;
+	}
 
 	DWORD size = 0;
 	unsigned char buffer[40];
@@ -514,18 +519,24 @@ int CGitHeadFileList::ReadHeadHash(const CString& gitdir)
 		m_HeadRefFile.Replace(_T('/'), _T('\\'));
 
 		__int64 time;
+		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T("yo yo yo yo #001 %s"), (LPCTSTR)m_HeadRefFile);
 		if (CGit::GetFileModifyTime(m_HeadRefFile, &time, nullptr))
 		{
+			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T("yo yo yo yo #002"));
 			m_HeadRefFile.Empty();
 			if (GetPackRef(gitdir))
 				return -1;
+			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T("yo yo yo yo #003"));
 			if (m_PackRefMap.find(ref) == m_PackRefMap.end())
 				return -1;
 
+			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T("yo yo yo yo #004"));
 			m_Head = m_PackRefMap[ref];
+			CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T("yo yo yo yo #005"));
 			return 0;
 		}
 
+		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": Going to read file file %s"), (LPCTSTR)m_HeadRefFile);
 		CAutoFile href = CreateFile(m_HeadRefFile,
 			GENERIC_READ,
 			FILE_SHARE_READ | FILE_SHARE_DELETE | FILE_SHARE_WRITE,
