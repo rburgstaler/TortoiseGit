@@ -480,8 +480,21 @@ int CGitHeadFileList::GetPackRef(const CString &gitdir)
 }
 int CGitHeadFileList::ReadHeadHash(const CString& gitdir)
 {
+
 	CAutoWriteLock lock(m_SharedMutex);
 	m_Gitdir = g_AdminDirMap.GetAdminDir(gitdir);
+
+	//Get the path that works with worktree's
+	CAutoRepository  ar(gitdir);
+	if (!ar)
+		return -1;
+	CString st(git_repository_path(ar));
+	st.Replace(_T('/'), _T('\\'));
+	CString st2(git_repository_commondir(ar));
+	st2.Replace(_T('/'), _T('\\'));
+	st2.AppendChar(_T('\\'));
+	m_Gitdir = st;
+	ar.Free();
 
 	m_HeadFile = m_Gitdir;
 	m_HeadFile += _T("HEAD");
@@ -524,6 +537,7 @@ int CGitHeadFileList::ReadHeadHash(const CString& gitdir)
 		CString ref = m_HeadRefFile.Trim();
 		int start = 0;
 		ref = ref.Tokenize(_T("\n"), start);
+		m_Gitdir = st2;
 		m_HeadRefFile = m_Gitdir + m_HeadRefFile;
 		m_HeadRefFile.Replace(_T('/'), _T('\\'));
 
