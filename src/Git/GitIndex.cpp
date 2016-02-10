@@ -467,8 +467,14 @@ int CGitHeadFileList::GetPackRef(const CString &gitdir)
 }
 int CGitHeadFileList::ReadHeadHash(const CString& gitdir)
 {
+
 	CAutoWriteLock lock(m_SharedMutex);
 	m_Gitdir = g_AdminDirMap.GetAdminDir(gitdir);
+	CAutoRepository  ar(gitdir);
+	CString st(git_repository_path(ar));
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": da %s"), (LPCTSTR)st);
+	ar.Free();
+	
 
 	m_HeadFile = m_Gitdir;
 	m_HeadFile += _T("HEAD");
