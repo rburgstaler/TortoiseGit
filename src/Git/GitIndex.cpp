@@ -470,11 +470,30 @@ int CGitHeadFileList::ReadHeadHash(const CString& gitdir)
 
 	CAutoWriteLock lock(m_SharedMutex);
 	m_Gitdir = g_AdminDirMap.GetAdminDir(gitdir);
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": da 0000 %s"), (LPCTSTR)gitdir);
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": da 0000 %s"), (LPCTSTR)m_Gitdir);
+
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": da 0001"));
 	CAutoRepository  ar(gitdir);
+	if (!ar)
+	{
+		CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": da 0001  --> Invalid dir"));
+		return -1;
+	}
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": da 0002"));
 	CString st(git_repository_path(ar));
-	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": da %s"), (LPCTSTR)st);
+	st.Replace(_T('/'), _T('\\'));
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": PATH %s"), (LPCTSTR)st);
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": da 0004"));
+	CString st2(git_repository_commondir(ar));
+	st2.Replace(_T('/'), _T('\\'));
+	st2.AppendChar(_T('\\'));
+	m_Gitdir = st;
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": CPATH %s"), (LPCTSTR)st2);
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": da 0005"));
 	ar.Free();
-	
+	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": da 0006"));
+
 
 	m_HeadFile = m_Gitdir;
 	m_HeadFile += _T("HEAD");
@@ -521,6 +540,9 @@ int CGitHeadFileList::ReadHeadHash(const CString& gitdir)
 		CString ref = m_HeadRefFile.Trim();
 		int start = 0;
 		ref = ref.Tokenize(_T("\n"), start);
+
+		m_Gitdir = st2;
+
 		m_HeadRefFile = m_Gitdir + m_HeadRefFile;
 		m_HeadRefFile.Replace(_T('/'), _T('\\'));
 
