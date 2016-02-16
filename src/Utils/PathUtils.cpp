@@ -484,4 +484,22 @@ CString CPathUtils::ExcludeTrailingPathDelimiter(const CString& path)
 	return result.TrimRight(_T("\\"));
 }
 
+CString CPathUtils::ExpandFileName(const CString& path)
+{
+	if (path.IsEmpty())
+		return path;
+	TCHAR pathbufcanonicalized[MAX_PATH] = { 0 }; // MAX_PATH ok.
+	DWORD ret = 0;
+	CString sRet = path;
+	ret = GetFullPathName(path, 0, NULL, NULL);
+	if (ret)
+	{
+		auto pathbuf = std::make_unique<TCHAR[]>(ret + 1);
+		if ((ret = GetFullPathName(path, ret, pathbuf.get(), NULL)) != 0)
+			sRet = CString(pathbuf.get(), ret);
+	}
+
+	return sRet;
+}
+
 #endif
