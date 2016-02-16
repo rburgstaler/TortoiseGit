@@ -472,4 +472,17 @@ CString CPathUtils::PathPatternUnEscape(const CString& path)
 	return result;
 }
 
+CString CPathUtils::IncludeTrailingPathDelimiter(const CString& path)
+{
+	CString result = path;
+	if ((result.GetLength() > 0) && (result[result.GetLength() - 1] != _T('\\'))) result.Append(_T("\\"));
+	return result;
+}
+
+CString CPathUtils::ExcludeTrailingPathDelimiter(const CString& path)
+{
+	CString result = path;
+	return result.TrimRight(_T("\\"));
+}
+
 #endif
