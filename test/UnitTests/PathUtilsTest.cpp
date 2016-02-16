@@ -97,3 +97,24 @@ TEST(CPathUtils, TrailingPathDelimiter)
 	tPath = _T("C:\\my\\path\\");
 	EXPECT_TRUE(CPathUtils::ExcludeTrailingPathDelimiter(tPath).Compare(_T("C:\\my\\path")) == 0);
 }
+
+TEST(CPathUtils, ExpandFileName)
+{
+	//It should eliminate ..
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("C:\\my\\path\\..\\da\\da\\da")).Compare(_T("C:\\my\\da\\da\\da")) == 0);
+	//It should eliminate .
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("C:\\my\\path\\.\\da\\da\\da")).Compare(_T("C:\\my\\path\\da\\da\\da")) == 0);
+	//It should not mess with trailing path delimiter if it is there
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("C:\\my\\path\\..\\da\\da\\da\\")).Compare(_T("C:\\my\\da\\da\\da\\")) == 0);
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("C:\\my\\path\\.\\da\\da\\da\\")).Compare(_T("C:\\my\\path\\da\\da\\da\\")) == 0);
+
+
+	//It should support UNC file paths::: ALL PATHS FROM ABOVE WILL PASS ASSUMING UNC ROOT
+	//It should eliminate ..
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("\\\\DACOMPUTER\\my\\path\\..\\da\\da\\da")).Compare(_T("\\\\DACOMPUTER\\my\\da\\da\\da")) == 0);
+	//It should eliminate .
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("\\\\DACOMPUTER\\my\\path\\.\\da\\da\\da")).Compare(_T("\\\\DACOMPUTER\\my\\path\\da\\da\\da")) == 0);
+	//It should not mess with trailing path delimiter if it is there
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("\\\\DACOMPUTER\\my\\path\\..\\da\\da\\da\\")).Compare(_T("\\\\DACOMPUTER\\my\\da\\da\\da\\")) == 0);
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("\\\\DACOMPUTER\\my\\path\\.\\da\\da\\da\\")).Compare(_T("\\\\DACOMPUTER\\my\\path\\da\\da\\da\\")) == 0);
+}
