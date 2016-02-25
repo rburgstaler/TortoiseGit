@@ -140,6 +140,15 @@ public:
 	* \return fully qualified path name
 	*/
 	static CString CPathUtils::ExpandFileName(const CString& path);
-
+	/**
+	* Compares two paths and returns true if they are the same path.  This method
+	* accounts for ..\'s and .\'s that may occur in the middle of the paths as well
+	* as case sensitivity.  The function does not account for symlinks at this point
+	* in time.
+	* \param path #1 to compare
+	* \param path #2 to compare
+	* \return true if they are the same path
+	*/
+	static bool CPathUtils::IsSamePath(const CString& path1, const CString& path2);
 #endif
 };

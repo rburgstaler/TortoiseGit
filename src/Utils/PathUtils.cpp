@@ -503,4 +503,18 @@ CString CPathUtils::ExpandFileName(const CString& path)
 	return sRet;
 }
 
+bool CPathUtils::IsSamePath(const CString& path1, const CString& path2)
+{
+	//1.) Account for ..\ and .\ that may occure in each path
+	//2.) Account for case
+	CString nPath1 = ExpandFileName(path1).MakeLower();
+	CString nPath2 = ExpandFileName(path2).MakeLower();
+	//3.) Account for a directory that can either have a trailing \ or not by just 
+	//    stripping it off
+	nPath1 = ExcludeTrailingPathDelimiter(nPath1);
+	nPath2 = ExcludeTrailingPathDelimiter(nPath2);
+	return (nPath1 == nPath2);
+}
+
+
 #endif
