@@ -79,25 +79,25 @@ public:
 	CAutoTempDir m_Dir;
 };
 
-class CBasicGitWithTestRepoFixture : public CBasicGitFixture
+class CBasicGitWithTestRepoCreatorFixture : public CBasicGitFixture
 {
 protected:
-	CBasicGitWithTestRepoFixture()
+	CBasicGitWithTestRepoCreatorFixture()
 	{
 		prefix = _T("\\.git");
 	}
 
-	virtual void SetUp()
+	void SetUpTestRepo(CString path)
 	{
-		CBasicGitFixture::SetUp();
 		CString resourcesDir = CPathUtils::GetAppDirectory() + _T("\\resources");
 		if (!PathIsDirectory(resourcesDir))
 		{
 			resourcesDir = CPathUtils::GetAppDirectory() + _T("\\..\\..\\..\\test\\UnitTests\\resources");
 			ASSERT_TRUE(PathIsDirectory(resourcesDir));
 		}
+		CString pathNoDelim = CPathUtils::ExcludeTrailingPathDelimiter(path);
 		if (!prefix.IsEmpty())
-			EXPECT_TRUE(CreateDirectory(m_Dir.GetTempDir() + prefix, nullptr));
+			EXPECT_TRUE(CreateDirectory(pathNoDelim + prefix, nullptr));
 		CString repoDir = resourcesDir + _T("\\git-repo1");
 		CDirFileEnum finder(repoDir);
 		bool isDir;
@@ -106,18 +106,33 @@ protected:
 		{
 			CString relpath = filepath.Mid(repoDir.GetLength());
 			if (isDir)
-				EXPECT_TRUE(CreateDirectory(m_Dir.GetTempDir() + prefix + relpath, nullptr));
+				EXPECT_TRUE(CreateDirectory(pathNoDelim + prefix + relpath, nullptr));
 			else
-				EXPECT_TRUE(CopyFile(filepath, m_Dir.GetTempDir() + prefix + relpath, false));
+				EXPECT_TRUE(CopyFile(filepath, pathNoDelim + prefix + relpath, false));
 		}
 
-		CString configFile = m_Dir.GetTempDir() + prefix + _T("\\config");
+		CString configFile = pathNoDelim + prefix + _T("\\config");
 		CString text;
 		ASSERT_TRUE(CStringUtils::ReadStringFromTextFile(configFile, text));
 		text += _T("\n[core]\n  autocrlf = false\n[user]\n  name = User\n  email = user@example.com\n");
 		EXPECT_TRUE(CStringUtils::WriteStringToTextFile((LPCTSTR)configFile, (LPCTSTR)text));
 	}
+
+	virtual void SetUp()
+	{
+		CBasicGitFixture::SetUp();
+	}
 	CString prefix;
+};
+
+class CBasicGitWithTestRepoFixture : public CBasicGitWithTestRepoCreatorFixture
+{
+protected:
+	virtual void SetUp()
+	{
+		CBasicGitWithTestRepoCreatorFixture::SetUp();
+		SetUpTestRepo(m_Dir.GetTempDir());
+	}
 };
 
 class CBasicGitWithTestRepoBareFixture : public CBasicGitWithTestRepoFixture
