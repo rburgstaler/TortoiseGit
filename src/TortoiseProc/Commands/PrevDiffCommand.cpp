@@ -43,7 +43,7 @@ bool PrevDiffCommand::Execute()
 	CLogDataVector revs;
 	CLogCache cache;
 	revs.m_pLogCache = &cache;
-	revs.ParserFromLog(&cmdLinePath, 2, CGit::LOG_INFO_ONLY_HASH);
+	revs.ParserFromLog(&cmdLinePath, 2, CGit::LOG_INFO_ONLY_HASH, nullptr, CRegDWORD(_T("Software\\TortoiseGit\\LogOrderBy"), CGit::LOG_ORDER_TOPOORDER));
 
 	if (revs.size() != 2)
 	{

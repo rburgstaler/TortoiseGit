@@ -2547,7 +2547,7 @@ int CGitLogListBase::FillGitLog(CTGitPath *path, CString *range, int info)
 	this->m_arShownList.SafeRemoveAll();
 
 	this->m_logEntries.ClearAll();
-	if (this->m_logEntries.ParserFromLog(path, 0, info, range))
+	if (this->m_logEntries.ParserFromLog(path, 0, info, range, CRegDWORD(_T("Software\\TortoiseGit\\LogOrderBy"), CGit::LOG_ORDER_TOPOORDER)))
 		return -1;
 
 	SetItemCountEx((int)m_logEntries.size());
@@ -2656,7 +2656,7 @@ int CGitLogListBase::BeginFetchLog()
 	if (mask & CGit::LOG_INFO_FOLLOW)
 		mask &= ~(CGit::LOG_INFO_ALL_BRANCH | CGit::LOG_INFO_BASIC_REFS | CGit::LOG_INFO_LOCAL_BRANCHES);
 
-	CString cmd = g_Git.GetLogCmd(m_sRange, path, mask, &m_Filter);
+	CString cmd = g_Git.GetLogCmd(m_sRange, path, mask, &m_Filter, CRegDWORD(_T("Software\\TortoiseGit\\LogOrderBy"), CGit::LOG_ORDER_TOPOORDER));
 
 	//this->m_logEntries.ParserFromLog();
 	if(IsInWorkingThread())
@@ -2691,7 +2691,7 @@ int CGitLogListBase::BeginFetchLog()
 		if (list.empty())
 			return 0;
 
-		cmd = g_Git.GetLogCmd(list[0], path, mask, &m_Filter);
+		cmd = g_Git.GetLogCmd(list[0], path, mask, &m_Filter, CRegDWORD(_T("Software\\TortoiseGit\\LogOrderBy"), CGit::LOG_ORDER_TOPOORDER));
 	}
 
 	g_Git.m_critGitDllSec.Lock();

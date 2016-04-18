@@ -208,7 +208,7 @@ bool CRevisionGraphWnd::FetchRevisionData
 	else if (!m_FromRev.IsEmpty())
 		range = m_FromRev;
 	DWORD infomask = CGit::LOG_INFO_SIMPILFY_BY_DECORATION | (m_bCurrentBranch ? 0 : m_bLocalBranches ? CGit::LOG_INFO_LOCAL_BRANCHES : CGit::LOG_INFO_ALL_BRANCH);
-	m_logEntries.ParserFromLog(nullptr, 0, infomask, &range);
+	m_logEntries.ParserFromLog(nullptr, 0, infomask, &range, CRegDWORD(_T("Software\\TortoiseGit\\LogOrderBy"), CGit::LOG_ORDER_TOPOORDER));
 
 	ReloadHashMap();
 	this->m_Graph.clear();
