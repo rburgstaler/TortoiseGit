@@ -140,7 +140,7 @@ static void ParserFromLogTests()
 	CLogDataVector logDataVector;
 	logDataVector.SetLogCache(&logCache);
 
-	EXPECT_EQ(0, logDataVector.ParserFromLog());
+	EXPECT_EQ(0, logDataVector.ParserFromLog(nullptr, 0, CGit::LOG_INFO_STAT | CGit::LOG_INFO_FILESTATE | CGit::LOG_INFO_SHOW_MERGEDFILE, nullptr, CGit::LOG_ORDER_TOPOORDER));
 	EXPECT_EQ(12, logDataVector.size());
 	EXPECT_EQ(12, logDataVector.m_HashMap.size());
 	EXPECT_EQ(12, logCache.m_HashMap.size());
@@ -151,7 +151,7 @@ static void ParserFromLogTests()
 	EXPECT_EQ(0, logDataVector.m_HashMap.size());
 	EXPECT_EQ(0, logCache.m_HashMap.size());
 
-	EXPECT_EQ(0, logDataVector.ParserFromLog(nullptr, 5));
+	EXPECT_EQ(0, logDataVector.ParserFromLog(nullptr, 5, CGit::LOG_INFO_STAT | CGit::LOG_INFO_FILESTATE | CGit::LOG_INFO_SHOW_MERGEDFILE, nullptr, CGit::LOG_ORDER_TOPOORDER));
 	ASSERT_EQ(5, logDataVector.size());
 	EXPECT_EQ(5, logDataVector.m_HashMap.size());
 	EXPECT_EQ(5, logCache.m_HashMap.size());
@@ -160,10 +160,9 @@ static void ParserFromLogTests()
 	EXPECT_STREQ(L"49ecdfff36bfe2b9b499b33e5034f427e2fa54dd", logDataVector.GetGitRevAt(2).m_CommitHash.ToString());
 	EXPECT_STREQ(L"560deea87853158b22d0c0fd73f60a458d47838a", logDataVector.GetGitRevAt(4).m_CommitHash.ToString());
 
-	EXPECT_EQ(CGit::LOG_ORDER_TOPOORDER, (DWORD)CRegDWORD(_T("Software\\TortoiseGit\\LogOrderBy"), CGit::LOG_ORDER_TOPOORDER)); // this dependency on user settings needs to be fixed!
 	logCache.m_HashMap.clear();
 	logDataVector.ClearAll();
-	EXPECT_EQ(0, logDataVector.ParserFromLog(nullptr, 0, CGit::LOG_INFO_ALL_BRANCH));
+	EXPECT_EQ(0, logDataVector.ParserFromLog(nullptr, 0, CGit::LOG_INFO_ALL_BRANCH, nullptr, CGit::LOG_ORDER_TOPOORDER));
 	ASSERT_EQ(23, logDataVector.size());
 	EXPECT_EQ(23, logDataVector.m_HashMap.size());
 	EXPECT_EQ(23, logCache.m_HashMap.size());
@@ -174,12 +173,12 @@ static void ParserFromLogTests()
 	logCache.m_HashMap.clear();
 	logDataVector.ClearAll();
 	CString range(L"does-not-exist");
-	EXPECT_EQ(-1, logDataVector.ParserFromLog(nullptr, 0, CGit::LOG_INFO_ALL_BRANCH, &range));
+	EXPECT_EQ(-1, logDataVector.ParserFromLog(nullptr, 0, CGit::LOG_INFO_ALL_BRANCH, &range, CGit::LOG_ORDER_TOPOORDER));
 	EXPECT_EQ(0, logDataVector.size());
 	EXPECT_EQ(0, logDataVector.m_HashMap.size());
 	EXPECT_EQ(0, logCache.m_HashMap.size());
 
-	EXPECT_EQ(-1, logDataVector.ParserFromLog(nullptr, 0, 0, &range));
+	EXPECT_EQ(-1, logDataVector.ParserFromLog(nullptr, 0, 0, &range, CGit::LOG_ORDER_TOPOORDER));
 	EXPECT_EQ(0, logDataVector.size());
 	EXPECT_EQ(0, logDataVector.m_HashMap.size());
 	EXPECT_EQ(0, logCache.m_HashMap.size());
@@ -187,7 +186,7 @@ static void ParserFromLogTests()
 	logCache.m_HashMap.clear();
 	logDataVector.ClearAll();
 	range = L"master2..master";
-	EXPECT_EQ(0, logDataVector.ParserFromLog(nullptr, 0, 0, &range));
+	EXPECT_EQ(0, logDataVector.ParserFromLog(nullptr, 0, 0, &range, CGit::LOG_ORDER_TOPOORDER));
 	ASSERT_EQ(2, logDataVector.size());
 	EXPECT_EQ(2, logDataVector.m_HashMap.size());
 	EXPECT_EQ(2, logCache.m_HashMap.size());
@@ -196,7 +195,7 @@ static void ParserFromLogTests()
 
 	logCache.m_HashMap.clear();
 	logDataVector.ClearAll();
-	EXPECT_EQ(0, logDataVector.ParserFromLog(nullptr, 0, CGit::LOG_INFO_ALL_BRANCH, &range));
+	EXPECT_EQ(0, logDataVector.ParserFromLog(nullptr, 0, CGit::LOG_INFO_ALL_BRANCH, &range, CGit::LOG_ORDER_TOPOORDER));
 	ASSERT_EQ(13, logDataVector.size());
 	EXPECT_EQ(13, logDataVector.m_HashMap.size());
 	EXPECT_EQ(13, logCache.m_HashMap.size());
@@ -204,7 +203,7 @@ static void ParserFromLogTests()
 	logCache.m_HashMap.clear();
 	logDataVector.ClearAll();
 	CTGitPath path(L"does-not-exist.txt");
-	EXPECT_EQ(0, logDataVector.ParserFromLog(&path));
+	EXPECT_EQ(0, logDataVector.ParserFromLog(&path, 0, CGit::LOG_INFO_STAT | CGit::LOG_INFO_FILESTATE | CGit::LOG_INFO_SHOW_MERGEDFILE, nullptr, CGit::LOG_ORDER_TOPOORDER));
 	EXPECT_EQ(0, logDataVector.size());
 	EXPECT_EQ(0, logDataVector.m_HashMap.size());
 	EXPECT_EQ(0, logCache.m_HashMap.size());
@@ -212,7 +211,7 @@ static void ParserFromLogTests()
 	logCache.m_HashMap.clear();
 	logDataVector.ClearAll();
 	path = CTGitPath(L"copy/utf16-be-bom.txt");
-	EXPECT_EQ(0, logDataVector.ParserFromLog(&path));
+	EXPECT_EQ(0, logDataVector.ParserFromLog(&path, 0, CGit::LOG_INFO_STAT | CGit::LOG_INFO_FILESTATE | CGit::LOG_INFO_SHOW_MERGEDFILE, nullptr, CGit::LOG_ORDER_TOPOORDER));
 	ASSERT_EQ(2, logDataVector.size());
 	EXPECT_EQ(2, logDataVector.m_HashMap.size());
 	EXPECT_EQ(2, logCache.m_HashMap.size());
@@ -221,7 +220,7 @@ static void ParserFromLogTests()
 
 	logCache.m_HashMap.clear();
 	logDataVector.ClearAll();
-	EXPECT_EQ(0, logDataVector.ParserFromLog(&path, 0, CGit::LOG_INFO_FOLLOW));
+	EXPECT_EQ(0, logDataVector.ParserFromLog(&path, 0, CGit::LOG_INFO_FOLLOW, nullptr, CGit::LOG_ORDER_TOPOORDER));
 	ASSERT_EQ(4, logDataVector.size());
 	EXPECT_EQ(4, logDataVector.m_HashMap.size());
 	EXPECT_EQ(4, logCache.m_HashMap.size());
@@ -232,7 +231,7 @@ static void ParserFromLogTests()
 	logCache.m_HashMap.clear();
 	logDataVector.ClearAll();
 	range = L"4c5c93d2a0b368bc4570d5ec02ab03b9c4334d44";
-	EXPECT_EQ(0, logDataVector.ParserFromLog(&path, 0, CGit::LOG_INFO_FOLLOW, &range));
+	EXPECT_EQ(0, logDataVector.ParserFromLog(&path, 0, CGit::LOG_INFO_FOLLOW, &range, CGit::LOG_ORDER_TOPOORDER));
 	ASSERT_EQ(3, logDataVector.size());
 	EXPECT_EQ(3, logDataVector.m_HashMap.size());
 	EXPECT_EQ(3, logCache.m_HashMap.size());
@@ -242,7 +241,7 @@ static void ParserFromLogTests()
 
 	logCache.m_HashMap.clear();
 	logDataVector.ClearAll();
-	EXPECT_EQ(0, logDataVector.ParserFromLog(&path, 0, CGit::LOG_INFO_FULL_DIFF, &range));
+	EXPECT_EQ(0, logDataVector.ParserFromLog(&path, 0, CGit::LOG_INFO_FULL_DIFF, &range, CGit::LOG_ORDER_TOPOORDER));
 	ASSERT_EQ(1, logDataVector.size());
 	EXPECT_EQ(1, logDataVector.m_HashMap.size());
 	EXPECT_EQ(1, logCache.m_HashMap.size());
@@ -264,7 +263,7 @@ static void ParserFromLogTests_EmptyRepo()
 	CLogCache logCache;
 	CLogDataVector logDataVector;
 	logDataVector.SetLogCache(&logCache);
-	EXPECT_EQ(-1, logDataVector.ParserFromLog());
+	EXPECT_EQ(-1, logDataVector.ParserFromLog(nullptr, 0, CGit::LOG_INFO_STAT | CGit::LOG_INFO_FILESTATE | CGit::LOG_INFO_SHOW_MERGEDFILE, nullptr, CGit::LOG_ORDER_TOPOORDER));
 	EXPECT_EQ(0, logDataVector.size());
 	EXPECT_EQ(0, logDataVector.m_HashMap.size());
 	EXPECT_EQ(0, logCache.m_HashMap.size());
