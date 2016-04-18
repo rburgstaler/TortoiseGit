@@ -44,11 +44,14 @@ public:
 	{
 		m_pLogCache=pLogCache;
 		m_FirstFreeLane=0;
+		//Default to value set in Registry
+		m_logOrderBy=CRegDWORD(_T("Software\\TortoiseGit\\LogOrderBy"), CGit::LOG_ORDER_TOPOORDER);
 	}
 	CLogDataVector()
 	{
 		m_pLogCache = nullptr;
 		m_FirstFreeLane=0;
+		m_logOrderBy=CRegDWORD(_T("Software\\TortoiseGit\\LogOrderBy"), CGit::LOG_ORDER_TOPOORDER);
 	}
 	void SetLogCache(CLogCache *pLogCache)
 	{
@@ -67,6 +70,8 @@ public:
 
 	Lanes m_Lns;
 	int	 m_FirstFreeLane;
+    //Log order: LOG_ORDER_CHRONOLOGIALREVERSED, LOG_ORDER_TOPOORDER, LOG_ORDER_DATEORDER,	
+	int m_logOrderBy;
 	MAP_HASH_REV m_HashMap;
 	void updateLanes(GitRevLoglist& c, Lanes& lns, CGitHash& sha);
 	void setLane(CGitHash& sha) ;
