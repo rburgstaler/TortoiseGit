@@ -2023,6 +2023,16 @@ BOOL CGit::CheckMsysGitDir(BOOL bFallback)
 	if (m_bInitialized)
 		return TRUE;
 
+	//This method requires the DLL to be initialized.  Failure to do so will result
+	//in not all things getting initialized properly.
+	try
+	{
+		CheckAndInitDll();
+	}
+	catch (...)
+	{
+	}
+
 	CTraceToOutputDebugString::Instance()(_T(__FUNCTION__) _T(": CheckMsysGitDir(%d)\n"), bFallback);
 	this->m_Environment.clear();
 	m_Environment.CopyProcessEnvironment();
