@@ -960,7 +960,7 @@ int git_get_config(const char *key, char *buffer, int size)
 // taken from msysgit: compat/mingw.c
 const char *get_windows_home_directory(void)
 {
-	static const char *home_directory = NULL;
+	char *home_directory = NULL;
 	struct strbuf buf = STRBUF_INIT;
 
 	if (home_directory)
