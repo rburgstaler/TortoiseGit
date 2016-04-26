@@ -472,4 +472,49 @@ CString CPathUtils::PathPatternUnEscape(const CString& path)
 	return result;
 }
 
+CString CPathUtils::IncludeTrailingPathDelimiter(const CString& path)
+{
+	CString result = path;
+	if ((result.GetLength() > 0) && (result[result.GetLength() - 1] != _T('\\'))) result.Append(_T("\\"));
+	return result;
+}
+
+CString CPathUtils::ExcludeTrailingPathDelimiter(const CString& path)
+{
+	CString result = path;
+	return result.TrimRight(_T("\\"));
+}
+
+CString CPathUtils::ExpandFileName(const CString& path)
+{
+	if (path.IsEmpty())
+		return path;
+	TCHAR pathbufcanonicalized[MAX_PATH] = { 0 }; // MAX_PATH ok.
+	DWORD ret = 0;
+	CString sRet = path;
+	ret = GetFullPathName(path, 0, NULL, NULL);
+	if (ret)
+	{
+		auto pathbuf = std::make_unique<TCHAR[]>(ret + 1);
+		if ((ret = GetFullPathName(path, ret, pathbuf.get(), NULL)) != 0)
+			sRet = CString(pathbuf.get(), ret);
+	}
+
+	return sRet;
+}
+
+bool CPathUtils::IsSamePath(const CString& path1, const CString& path2)
+{
+	//1.) Account for ..\ and .\ that may occure in each path
+	//2.) Account for case
+	CString nPath1 = ExpandFileName(path1).MakeLower();
+	CString nPath2 = ExpandFileName(path2).MakeLower();
+	//3.) Account for a directory that can either have a trailing \ or not by just 
+	//    stripping it off
+	nPath1 = ExcludeTrailingPathDelimiter(nPath1);
+	nPath2 = ExcludeTrailingPathDelimiter(nPath2);
+	return (nPath1 == nPath2);
+}
+
+
 #endif

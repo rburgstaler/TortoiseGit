@@ -85,3 +85,63 @@ TEST(CPathUtils, MakeSureDirectoryPathExists)
 	EXPECT_TRUE(PathIsDirectory(tmpDir.GetTempDir() + L"\\sub\\asub"));
 	EXPECT_TRUE(PathIsDirectory(tmpDir.GetTempDir() + L"\\sub\\asub\\adir"));
 }
+
+TEST(CPathUtils, TrailingPathDelimiter)
+{
+	CString tPath = _T("C:\\my\\path");
+	EXPECT_TRUE(CPathUtils::IncludeTrailingPathDelimiter(tPath).Compare(_T("C:\\my\\path\\")) == 0);
+	tPath = _T("C:\\my\\path\\");
+	EXPECT_TRUE(CPathUtils::IncludeTrailingPathDelimiter(tPath).Compare(_T("C:\\my\\path\\")) == 0);
+	tPath = _T("C:\\my\\path");
+	EXPECT_TRUE(CPathUtils::ExcludeTrailingPathDelimiter(tPath).Compare(_T("C:\\my\\path")) == 0);
+	tPath = _T("C:\\my\\path\\");
+	EXPECT_TRUE(CPathUtils::ExcludeTrailingPathDelimiter(tPath).Compare(_T("C:\\my\\path")) == 0);
+}
+
+TEST(CPathUtils, ExpandFileName)
+{
+	//It should eliminate ..
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("C:\\my\\path\\..\\da\\da\\da")).Compare(_T("C:\\my\\da\\da\\da")) == 0);
+	//It should eliminate .
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("C:\\my\\path\\.\\da\\da\\da")).Compare(_T("C:\\my\\path\\da\\da\\da")) == 0);
+	//It should not mess with trailing path delimiter if it is there
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("C:\\my\\path\\..\\da\\da\\da\\")).Compare(_T("C:\\my\\da\\da\\da\\")) == 0);
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("C:\\my\\path\\.\\da\\da\\da\\")).Compare(_T("C:\\my\\path\\da\\da\\da\\")) == 0);
+
+
+	//It should support UNC file paths::: ALL PATHS FROM ABOVE WILL PASS ASSUMING UNC ROOT
+	//It should eliminate ..
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("\\\\DACOMPUTER\\my\\path\\..\\da\\da\\da")).Compare(_T("\\\\DACOMPUTER\\my\\da\\da\\da")) == 0);
+	//It should eliminate .
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("\\\\DACOMPUTER\\my\\path\\.\\da\\da\\da")).Compare(_T("\\\\DACOMPUTER\\my\\path\\da\\da\\da")) == 0);
+	//It should not mess with trailing path delimiter if it is there
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("\\\\DACOMPUTER\\my\\path\\..\\da\\da\\da\\")).Compare(_T("\\\\DACOMPUTER\\my\\da\\da\\da\\")) == 0);
+	EXPECT_TRUE(CPathUtils::ExpandFileName(_T("\\\\DACOMPUTER\\my\\path\\.\\da\\da\\da\\")).Compare(_T("\\\\DACOMPUTER\\my\\path\\da\\da\\da\\")) == 0);
+}
+
+TEST(CPathUtils, IsSamePath)
+{
+	//Compare the same path
+	EXPECT_TRUE(CPathUtils::IsSamePath(_T("C:\\my\\path\\da\\da\\da"), _T("C:\\my\\path\\da\\da\\da")));
+	//Compare the non-same path
+	EXPECT_FALSE(CPathUtils::IsSamePath(_T("C:\\my\\path\\da\\da\\da"), _T("C:\\this\\is\\a\\new\\path")));
+	//Compare the non-same path because of going back a path at the end
+	EXPECT_FALSE(CPathUtils::IsSamePath(_T("C:\\my\\path\\da\\da\\da"), _T("C:\\my\\path\\da\\da\\da\\..")));
+	//Compare the same path because of staying in same directory at the end
+	EXPECT_TRUE(CPathUtils::IsSamePath(_T("C:\\my\\path\\da\\da\\da"), _T("C:\\my\\path\\da\\da\\da\\.")));
+	//Compare the same path because of staying in same directory at the end (with trailing path delimiter)
+	EXPECT_TRUE(CPathUtils::IsSamePath(_T("C:\\my\\path\\da\\da\\da"), _T("C:\\my\\path\\da\\da\\da\\.\\")));
+	//Compare when including backslash
+	EXPECT_TRUE(CPathUtils::IsSamePath(_T("C:\\my\\path\\da\\da\\da"), _T("C:\\my\\path\\da\\da\\da\\")));
+	//Compare the same path when one goes back one directory in the middle
+	EXPECT_TRUE(CPathUtils::IsSamePath(_T("C:\\my\\path\\da\\da\\da"), _T("C:\\my\\path\\..\\path\\da\\da\\da")));
+	//Compare the same path when we stay in the same directory
+	EXPECT_TRUE(CPathUtils::IsSamePath(_T("C:\\my\\path\\da\\da\\da"), _T("C:\\my\\path\\.\\.\\da\\da\\da")));
+	//Check if injecting a difference in case causes problems
+	EXPECT_TRUE(CPathUtils::IsSamePath(_T("C:\\my\\path\\da\\da\\da"), _T("C:\\my\\path\\..\\path\\da\\DA\\da")));
+	//Check when the directories are the same when the ..\ is right before the end
+	EXPECT_TRUE(CPathUtils::IsSamePath(_T("C:\\my\\path\\da\\da\\da"), _T("C:\\my\\path\\..\\path\\da\\da\\da\\..\\da")));
+	//Check for non-matching paths
+	EXPECT_FALSE(CPathUtils::IsSamePath(_T("C:\\my\\path\\da\\da\\da"), _T("C:\\my\\path\\..\\path\\da\\da\\da\\.\\da")));
+
+}
