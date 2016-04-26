@@ -23,6 +23,7 @@
 #include "UnicodeUtils.h"
 #include "ReaderWriterLock.h"
 #include "GitAdminDir.h"
+#include "PathUtils.h"
 
 class CGitIndex
 {
@@ -441,28 +442,21 @@ public:
 
 	CString GetAdminDir(const CString &path)
 	{
-		CString thePath(path);
+		CString thePath(CPathUtils::ExcludeTrailingPathDelimiter(path));
 		thePath.MakeLower();
 		CAutoLocker lock(m_critIndexSec);
 		auto lookup = find(thePath);
 		if (lookup == cend())
 		{
-			if (PathIsDirectory(path + _T("\\.git")))
+			CString adminDir = "";
+			GitAdminDir::GetAdminDirPath(thePath, adminDir);
+			if (PathIsDirectory(adminDir))
 			{
-				(*this)[thePath] = path + _T("\\.git\\");
-				m_reverseLookup[thePath + _T("\\.git")] = path;
+				(*this)[thePath] = adminDir;
+				m_reverseLookup[adminDir] = thePath;
 				return (*this)[thePath];
 			}
-
-			CString result = GitAdminDir::ReadGitLink(path, path + _T("\\.git"));
-			if (!result.IsEmpty())
-			{
-				(*this)[thePath] = result + _T("\\");
-				m_reverseLookup[result.MakeLower()] = path;
-				return (*this)[thePath];
-			}
-
-			return path + _T("\\.git\\"); // in case of an error stick to old behavior
+			return thePath + _T(".git\\"); // in case of an error stick to old behavior
 		}
 
 		return lookup->second;
