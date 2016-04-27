@@ -22,6 +22,7 @@
 #include "GitAdminDir.h"
 #include "Git.h"
 #include "SmartHandle.h"
+#include "PathUtils.h"
 
 GitAdminDir::GitAdminDir()
 {
@@ -159,10 +160,16 @@ bool GitAdminDir::GetAdminDirPath(const CString &projectTopDir, CString& adminDi
 	fclose(pFile);
 	CStringA commonDirA(buffer.get(), length);
 	CString commonDir = CUnicodeUtils::GetUnicode(commonDirA);
+	commonDir.Replace('/', '\\');
+	//Trailing carriage returns and line feeds cause the directory path to not be recognized
+	commonDir.Replace(L"\n", L"");
+	commonDir.Replace(L"\r", L"");
 	if (PathIsRelative(commonDir))
 		adminDir = wtAdminDir + commonDir;
 	else
 		adminDir = commonDir;
+	adminDir.TrimRight('\\');
+	adminDir.Append(L"\\");
 	return true;
 }
 
@@ -176,7 +183,7 @@ bool GitAdminDir::GetWorktreeAdminDirPath(const CString &projectTopDir, CString&
 		return true;
 	}
 
-	CString sDotGitPath = projectTopDir + _T("\\") + GetAdminDirName();
+	CString sDotGitPath = CPathUtils::IncludeTrailingPathDelimiter(projectTopDir) + GetAdminDirName();
 	if (CTGitPath(sDotGitPath).IsDirectory())
 	{
 		sDotGitPath.TrimRight('\\');
@@ -189,7 +196,7 @@ bool GitAdminDir::GetWorktreeAdminDirPath(const CString &projectTopDir, CString&
 		CString result = ReadGitLink(projectTopDir, sDotGitPath);
 		if (result.IsEmpty())
 			return false;
-		adminDir = result + _T("\\");
+		adminDir = CPathUtils::IncludeTrailingPathDelimiter(result);
 		return true;
 	}
 }
