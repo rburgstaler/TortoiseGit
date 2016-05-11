@@ -1,0 +1,194 @@
+From 32cda797c420b337b5d631ff491d63f17b50f23d Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Tue, 27 Oct 2015 12:37:51 +0100
+Subject: [PATCH 1019/1024] worktree: implement functions reading HEAD
+
+Implement `git_worktree_head` and `git_worktree_head_detached`
+for directly accessing a worktree's HEAD without opening it as a
+`git_repository` first.
+---
+ include/git2/worktree.h   | 25 ++++++++++++++
+ src/worktree.c            | 85 +++++++++++++++++++++++++++++++++++++++++++++++
+ tests/worktree/worktree.c | 27 +++++++++++++++
+ 3 files changed, 137 insertions(+)
+
+diff --git a/include/git2/worktree.h b/include/git2/worktree.h
+index 2d818bc..7017e65 100644
+--- a/include/git2/worktree.h
++++ b/include/git2/worktree.h
+@@ -90,6 +90,31 @@ GIT_EXTERN(int) git_worktree_validate(const git_worktree *wt);
+ GIT_EXTERN(int) git_worktree_init(git_worktree **out, git_repository *repo, const char *name, const char *path);
+ 
+ /*
++ * Check if a worktree's HEAD is detached
++ *
++ * A worktree's HEAD is detached when it points directly to a
++ * commit instead of a branch.
++ *
++ * @param repo a repository object
++ * @param name name of the worktree to retrieve HEAD for
++ * @return 1 if HEAD is detached, 0 if its not; error code if
++ *  there was an error
++ */
++GIT_EXTERN(int) git_worktree_head_detached(git_repository *repo, const char *name);
++
++/**
++ * Retrieve the referenced HEAD for the worktree
++ *
++ * @param out pointer to the reference which will be retrieved
++ * @param repo a repository object
++ * @param name name of the worktree to retrieve HEAD for
++ * @return 0 when successful, error-code otherwise
++ */
++GIT_EXTERN(int) git_worktree_head(git_reference **out,
++	git_repository *repo,
++	const char *name);
++
++/**
+  * Lock worktree if not already locked
+  *
+  * Lock a worktree, optionally specifying a reason why the linked
+diff --git a/src/worktree.c b/src/worktree.c
+index a875fbd..fc6ec2b 100644
+--- a/src/worktree.c
++++ b/src/worktree.c
+@@ -315,6 +315,91 @@ out:
+ 	return err;
+ }
+ 
++static int read_worktree_head(git_buf *out, git_repository *repo, const char *name)
++{
++	git_buf path = GIT_BUF_INIT;
++	int err;
++
++	assert(out && repo && name);
++
++	git_buf_clear(out);
++
++	if ((err = git_buf_printf(&path, "%s/worktrees/%s/HEAD", repo->commondir, name)) < 0)
++		goto out;
++	if (!git_path_exists(path.ptr))
++	{
++		err = -1;
++		goto out;
++	}
++
++	if ((err = git_futils_readbuffer(out, path.ptr)) < 0)
++		goto out;
++	git_buf_rtrim(out);
++
++out:
++	git_buf_free(&path);
++
++	return err;
++}
++
++int git_worktree_head(git_reference **out, git_repository *repo, const char *name)
++{
++	git_buf buf = GIT_BUF_INIT;
++	git_reference *head;
++	int err;
++
++	assert(out && repo && name);
++
++	*out = NULL;
++
++	if (git_worktree_head_detached(repo, name))
++		return -1;
++	if ((err = read_worktree_head(&buf, repo, name)) < 0)
++		goto out;
++
++	/* We can only resolve symbolic references */
++	if (git__strncmp(buf.ptr, GIT_SYMREF, strlen(GIT_SYMREF)))
++	{
++		err = -1;
++		goto out;
++	}
++	git_buf_consume(&buf, buf.ptr + strlen(GIT_SYMREF));
++
++	if ((err = git_reference_lookup(&head, repo, buf.ptr)) < 0)
++		goto out;
++	if (git_reference_type(head) == GIT_REF_OID)
++	{
++		*out = head;
++		err = 0;
++		goto out;
++	}
++
++	err = git_reference_lookup_resolved(
++		out, repo, git_reference_symbolic_target(head), -1);
++	git_reference_free(head);
++
++out:
++	git_buf_free(&buf);
++
++	return err;
++}
++
++int git_worktree_head_detached(git_repository *repo, const char *name)
++{
++	git_buf buf = GIT_BUF_INIT;
++	int ret;
++
++	assert(repo && name);
++
++	if (read_worktree_head(&buf, repo, name) < 0)
++		return -1;
++
++	ret = git__strncmp(buf.ptr, GIT_SYMREF, strlen(GIT_SYMREF)) != 0;
++	git_buf_free(&buf);
++
++	return ret;
++}
++
+ int git_worktree_lock(git_worktree *wt, char *creason)
+ {
+ 	git_buf buf = GIT_BUF_INIT, path = GIT_BUF_INIT;
+diff --git a/tests/worktree/worktree.c b/tests/worktree/worktree.c
+index 44dd9a8..94907ee 100644
+--- a/tests/worktree/worktree.c
++++ b/tests/worktree/worktree.c
+@@ -1,6 +1,7 @@
+ #include "clar_libgit2.h"
+ #include "worktree_helpers.h"
+ 
++#include "checkout.h"
+ #include "repository.h"
+ #include "worktree.h"
+ 
+@@ -317,6 +318,32 @@ void test_worktree_worktree__validate_invalid_parent(void)
+ 	git_worktree_free(wt);
+ }
+ 
++void test_worktree_worktree__head(void)
++{
++	git_reference *ref, *head;
++
++	cl_git_pass(git_reference_lookup(&ref, fixture.repo, "refs/heads/testrepo-worktree"));
++	cl_git_pass(git_worktree_head(&head, fixture.repo, "testrepo-worktree"));
++	cl_assert(git_reference_cmp(ref, head) == 0);
++
++	git_reference_free(ref);
++	git_reference_free(head);
++}
++
++void test_worktree_worktree__head_detached(void)
++{
++	git_reference *ref, *head;
++
++	cl_git_pass(git_reference_lookup(&ref, fixture.repo, "refs/heads/testrepo-worktree"));
++	cl_git_pass(git_repository_set_head_detached(fixture.worktree, &ref->target.oid));
++
++	cl_assert(git_repository_head_detached(fixture.worktree));
++	cl_assert(git_worktree_head_detached(fixture.repo, "testrepo-worktree"));
++	cl_git_fail(git_worktree_head(&head, fixture.repo, "testrepo-worktree"));
++
++	git_reference_free(ref);
++}
++
+ void test_worktree_worktree__lock_with_reason(void)
+ {
+ 	git_worktree *wt;
+-- 
+2.8.1.windows.1
+

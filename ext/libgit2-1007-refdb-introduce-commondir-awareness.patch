@@ -1,0 +1,206 @@
+From 085efc5a32c11fea09af81e74f16a7b21de2065c Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Wed, 16 Sep 2015 16:09:24 +0200
+Subject: [PATCH 1007/1024] refdb: introduce commondir awareness
+
+The refdb_fs_backend is not aware of the git commondir, which
+stores common objects like the o bject database and packed/loose
+refereensces when worktrees are used.
+
+Make refdb_fs_backend aware of the common directory by
+introducing a new commonpath variable that points to the actual
+common path of the database and using it instead of the gitdir
+for the mentioned objects.
+---
+ src/refdb_fs.c        | 34 +++++++++++++++++++++-----
+ tests/worktree/refs.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 96 insertions(+), 6 deletions(-)
+ create mode 100644 tests/worktree/refs.c
+
+diff --git a/src/refdb_fs.c b/src/refdb_fs.c
+index 647aea6..027bded 100644
+--- a/src/refdb_fs.c
++++ b/src/refdb_fs.c
+@@ -57,6 +57,8 @@ typedef struct refdb_fs_backend {
+ 	git_repository *repo;
+ 	/* path to git directory */
+ 	char *gitpath;
++	/* path to common objects' directory */
++	char *commonpath;
+ 
+ 	git_sortedcache *refcache;
+ 	int peeling_mode;
+@@ -362,6 +364,14 @@ static const char *loose_parse_symbolic(git_buf *file_content)
+ 	return refname_start;
+ }
+ 
++static bool is_per_worktree_ref(const char *ref_name)
++{
++	return strcmp("HEAD", ref_name) == 0 ||
++	    strcmp("FETCH_HEAD", ref_name) == 0 ||
++	    strcmp("MERGE_HEAD", ref_name) == 0 ||
++	    strcmp("ORIG_HEAD", ref_name) == 0;
++}
++
+ static int loose_lookup(
+ 	git_reference **out,
+ 	refdb_fs_backend *backend,
+@@ -369,11 +379,17 @@ static int loose_lookup(
+ {
+ 	git_buf ref_file = GIT_BUF_INIT;
+ 	int error = 0;
++	const char *ref_dir;
+ 
+ 	if (out)
+ 		*out = NULL;
+ 
+-	if ((error = loose_readbuffer(&ref_file, backend->gitpath, ref_name)) < 0)
++	if (is_per_worktree_ref(ref_name))
++		ref_dir = backend->gitpath;
++	else
++		ref_dir = backend->commonpath;
++
++	if ((error = loose_readbuffer(&ref_file, ref_dir, ref_name)) < 0)
+ 		/* cannot read loose ref file - gah */;
+ 	else if (git__prefixcmp(git_buf_cstr(&ref_file), GIT_SYMREF) == 0) {
+ 		const char *target;
+@@ -484,12 +500,12 @@ static int iter_load_loose_paths(refdb_fs_backend *backend, refdb_fs_iter *iter)
+ 	git_iterator_options fsit_opts = GIT_ITERATOR_OPTIONS_INIT;
+ 	const git_index_entry *entry = NULL;
+ 
+-	if (!backend->gitpath) /* do nothing if no gitpath for loose refs */
++	if (!backend->commonpath) /* do nothing if no commonpath for loose refs */
+ 		return 0;
+ 
+ 	fsit_opts.flags = backend->iterator_flags;
+ 
+-	if ((error = git_buf_printf(&path, "%s/refs", backend->gitpath)) < 0 ||
++	if ((error = git_buf_printf(&path, "%s/refs", backend->commonpath)) < 0 ||
+ 		(error = git_iterator_for_filesystem(&fsit, path.ptr, &fsit_opts)) < 0) {
+ 		git_buf_free(&path);
+ 		return error;
+@@ -1383,6 +1399,7 @@ static void refdb_fs_backend__free(git_refdb_backend *_backend)
+ 
+ 	git_sortedcache_free(backend->refcache);
+ 	git__free(backend->gitpath);
++	git__free(backend->commonpath);
+ 	git__free(backend);
+ }
+ 
+@@ -1393,6 +1410,8 @@ static int setup_namespace(git_buf *gitpath, git_repository *repo)
+ 	/* Not all repositories have a gitpath */
+ 	if (repo->path_repository == NULL)
+ 		return 0;
++	if (repo->commondir == NULL)
++		return 0;
+ 
+ 	/* Load the path to the repo first */
+ 	git_buf_puts(gitpath, repo->path_repository);
+@@ -1419,7 +1438,7 @@ static int setup_namespace(git_buf *gitpath, git_repository *repo)
+ 	git__free(parts);
+ 
+ 	/* Make sure that the folder with the namespace exists */
+-	if (git_futils_mkdir_relative(git_buf_cstr(gitpath), repo->path_repository,
++	if (git_futils_mkdir_relative(git_buf_cstr(gitpath), repo->commondir,
+ 			0777, GIT_MKDIR_PATH, NULL) < 0)
+ 		return -1;
+ 
+@@ -1932,9 +1951,11 @@ int git_refdb_backend_fs(
+ 	if (setup_namespace(&gitpath, repository) < 0)
+ 		goto fail;
+ 
+-	backend->gitpath = git_buf_detach(&gitpath);
++	backend->gitpath = backend->commonpath =  git_buf_detach(&gitpath);
++	if (repository->commondir)
++		backend->commonpath = git__strdup(repository->commondir);
+ 
+-	if (git_buf_joinpath(&gitpath, backend->gitpath, GIT_PACKEDREFS_FILE) < 0 ||
++	if (git_buf_joinpath(&gitpath, backend->commonpath, GIT_PACKEDREFS_FILE) < 0 ||
+ 		git_sortedcache_new(
+ 			&backend->refcache, offsetof(struct packref, name),
+ 			NULL, NULL, packref_cmp, git_buf_cstr(&gitpath)) < 0)
+@@ -1974,6 +1995,7 @@ int git_refdb_backend_fs(
+ fail:
+ 	git_buf_free(&gitpath);
+ 	git__free(backend->gitpath);
++	git__free(backend->commonpath);
+ 	git__free(backend);
+ 	return -1;
+ }
+diff --git a/tests/worktree/refs.c b/tests/worktree/refs.c
+new file mode 100644
+index 0000000..e08e553
+--- /dev/null
++++ b/tests/worktree/refs.c
+@@ -0,0 +1,68 @@
++#include "clar_libgit2.h"
++#include "worktree_helpers.h"
++
++#define COMMON_REPO "testrepo"
++#define WORKTREE_REPO "testrepo-worktree"
++
++static worktree_fixture fixture =
++	WORKTREE_FIXTURE_INIT(COMMON_REPO, WORKTREE_REPO);
++
++void test_worktree_refs__initialize(void)
++{
++	setup_fixture_worktree(&fixture);
++}
++
++void test_worktree_refs__cleanup(void)
++{
++	cleanup_fixture_worktree(&fixture);
++}
++
++void test_worktree_refs__list(void)
++{
++	git_strarray refs, wtrefs;
++	unsigned i, j;
++	int error = 0;
++
++	cl_git_pass(git_reference_list(&refs, fixture.repo));
++	cl_git_pass(git_reference_list(&wtrefs, fixture.worktree));
++
++	if (refs.count != wtrefs.count)
++	{
++		error = GIT_ERROR;
++		goto exit;
++	}
++
++	for (i = 0; i < refs.count; i++)
++	{
++		int found = 0;
++
++		for (j = 0; j < wtrefs.count; j++)
++		{
++			if (!strcmp(refs.strings[i], wtrefs.strings[j]))
++			{
++				found = 1;
++				break;
++			}
++		}
++
++		if (!found)
++		{
++			error = GIT_ERROR;
++			goto exit;
++		}
++	}
++
++exit:
++	git_strarray_free(&refs);
++	git_strarray_free(&wtrefs);
++	cl_git_pass(error);
++}
++
++void test_worktree_refs__read_head(void)
++{
++	git_reference *head;
++
++	cl_git_pass(git_repository_head(&head, fixture.worktree));
++
++	git_reference_free(head);
++}
+-- 
+2.8.1.windows.1
+

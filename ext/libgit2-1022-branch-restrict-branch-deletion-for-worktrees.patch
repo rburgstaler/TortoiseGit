@@ -1,0 +1,51 @@
+From 8f21a27d22b73c4d93acf160a635c29b30bdb107 Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Fri, 6 Nov 2015 12:33:59 +0100
+Subject: [PATCH 1022/1024] branch: restrict branch deletion for worktrees
+
+Restrict the ability to delete branches that are checked out in
+any linked repository.
+---
+ src/branch.c          |  6 ++++++
+ tests/worktree/refs.c | 11 +++++++++++
+ 2 files changed, 17 insertions(+)
+
+diff --git a/src/branch.c b/src/branch.c
+index ad492a2..7fddf1a 100644
+--- a/src/branch.c
++++ b/src/branch.c
+@@ -205,6 +205,12 @@ int git_branch_delete(git_reference *branch)
+ 		return -1;
+ 	}
+ 
++	if (git_reference_is_branch(branch) && git_branch_is_checked_out(branch)) {
++		giterr_set(GITERR_REFERENCE, "Cannot delete branch '%s' as it is "
++			"the current HEAD of a linked repository.", git_reference_name(branch));
++		return -1;
++	}
++
+ 	if (git_buf_join(&config_section, '.', "branch",
+ 			git_reference_name(branch) + strlen(GIT_REFS_HEADS_DIR)) < 0)
+ 		goto on_error;
+diff --git a/tests/worktree/refs.c b/tests/worktree/refs.c
+index e08e553..963c940 100644
+--- a/tests/worktree/refs.c
++++ b/tests/worktree/refs.c
+@@ -66,3 +66,14 @@ void test_worktree_refs__read_head(void)
+ 
+ 	git_reference_free(head);
+ }
++
++void test_worktree_refs__delete_fails_for_checked_out_branch(void)
++{
++       git_reference *branch;
++
++       cl_git_pass(git_branch_lookup(&branch, fixture.repo,
++               "testrepo-worktree", GIT_BRANCH_LOCAL));
++       cl_git_fail(git_branch_delete(branch));
++
++       git_reference_free(branch);
++}
+-- 
+2.8.1.windows.1
+

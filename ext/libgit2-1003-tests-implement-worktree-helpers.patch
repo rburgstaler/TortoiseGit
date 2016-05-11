@@ -1,0 +1,68 @@
+From 48827ea56dee57d6a61121de28240936794ef396 Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Wed, 11 Nov 2015 10:54:41 +0100
+Subject: [PATCH 1003/1024] tests: implement worktree helpers
+
+---
+ tests/worktree/worktree_helpers.c | 30 ++++++++++++++++++++++++++++++
+ tests/worktree/worktree_helpers.h | 11 +++++++++++
+ 2 files changed, 41 insertions(+)
+ create mode 100644 tests/worktree/worktree_helpers.c
+ create mode 100644 tests/worktree/worktree_helpers.h
+
+diff --git a/tests/worktree/worktree_helpers.c b/tests/worktree/worktree_helpers.c
+new file mode 100644
+index 0000000..6d4cdba
+--- /dev/null
++++ b/tests/worktree/worktree_helpers.c
+@@ -0,0 +1,30 @@
++#include "clar_libgit2.h"
++#include "worktree_helpers.h"
++
++void cleanup_fixture_worktree(worktree_fixture *fixture)
++{
++	if (!fixture)
++		return;
++
++	if (fixture->repo) {
++		git_repository_free(fixture->repo);
++		fixture->repo = NULL;
++	}
++	if (fixture->worktree) {
++		git_repository_free(fixture->worktree);
++		fixture->worktree = NULL;
++	}
++
++	if (fixture->reponame)
++		cl_fixture_cleanup(fixture->reponame);
++	if (fixture->worktreename)
++		cl_fixture_cleanup(fixture->worktreename);
++}
++
++void setup_fixture_worktree(worktree_fixture *fixture)
++{
++	if (fixture->reponame)
++		fixture->repo = cl_git_sandbox_init(fixture->reponame);
++	if (fixture->worktreename)
++		fixture->worktree = cl_git_sandbox_init(fixture->worktreename);
++}
+diff --git a/tests/worktree/worktree_helpers.h b/tests/worktree/worktree_helpers.h
+new file mode 100644
+index 0000000..35ea9ed
+--- /dev/null
++++ b/tests/worktree/worktree_helpers.h
+@@ -0,0 +1,11 @@
++typedef struct {
++	const char *reponame;
++	const char *worktreename;
++	git_repository *repo;
++	git_repository *worktree;
++} worktree_fixture;
++
++#define WORKTREE_FIXTURE_INIT(repo, worktree) { (repo), (worktree), NULL, NULL }
++
++void cleanup_fixture_worktree(worktree_fixture *fixture);
++void setup_fixture_worktree(worktree_fixture *fixture);
+-- 
+2.8.1.windows.1
+

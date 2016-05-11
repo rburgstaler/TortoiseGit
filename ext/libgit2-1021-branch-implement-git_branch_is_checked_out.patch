@@ -1,0 +1,116 @@
+From 6497a485f53341e9ec918a84267946fac4ad962f Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Fri, 6 Nov 2015 12:08:15 +0100
+Subject: [PATCH 1021/1024] branch: implement `git_branch_is_checked_out`
+
+Implement a new function that is able to determine if a branch is
+checked out in any repository connected to the current
+repository. In particular, this is required to check if for a
+given repository and branch, there exists any working tree
+connected to that repository that is referencing this branch.
+---
+ include/git2/branch.h | 12 +++++++++++
+ src/branch.c          | 57 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 69 insertions(+)
+
+diff --git a/include/git2/branch.h b/include/git2/branch.h
+index 34354f4..88fe723 100644
+--- a/include/git2/branch.h
++++ b/include/git2/branch.h
+@@ -246,6 +246,18 @@ GIT_EXTERN(int) git_branch_is_head(
+ 	const git_reference *branch);
+ 
+ /**
++ * Determine if the current branch is checked out in any linked
++ * repository.
++ *
++ * @param branch Reference to the branch.
++ *
++ * @return 1 if branch is checked out, 0 if it isn't,
++ * error code otherwise.
++ */
++GIT_EXTERN(int) git_branch_is_checked_out(
++	const git_reference *branch);
++
++/**
+  * Return the name of remote that the remote tracking branch belongs to.
+  *
+  * @param out Pointer to the user-allocated git_buf which will be filled with the name of the remote.
+diff --git a/src/branch.c b/src/branch.c
+index 51c35d7..ad492a2 100644
+--- a/src/branch.c
++++ b/src/branch.c
+@@ -13,6 +13,7 @@
+ #include "refs.h"
+ #include "remote.h"
+ #include "annotated_commit.h"
++#include "worktree.h"
+ 
+ #include "git2/branch.h"
+ 
+@@ -125,6 +126,62 @@ int git_branch_create_from_annotated(
+ 		repository, branch_name, commit->commit, commit->description, force);
+ }
+ 
++int git_branch_is_checked_out(
++	const git_reference *branch)
++{
++	git_buf path = GIT_BUF_INIT, buf = GIT_BUF_INIT;
++	git_strarray worktrees;
++	git_reference *ref = NULL;
++	git_repository *repo;
++	const char *worktree;
++	int found = false;
++	size_t i;
++
++	assert(branch && git_reference_is_branch(branch));
++
++	repo = git_reference_owner(branch);
++
++	if (git_worktree_list(&worktrees, repo) < 0)
++		return -1;
++
++	for (i = 0; i < worktrees.count; i++) {
++		worktree = worktrees.strings[i];
++
++		if (git_worktree_head(&ref, repo, worktree) < 0)
++			continue;
++
++		if (git__strcmp(ref->name, branch->name) == 0) {
++			found = true;
++			git_reference_free(ref);
++			break;
++		}
++
++		git_reference_free(ref);
++	}
++	git_strarray_free(&worktrees);
++
++	if (found)
++		return found;
++
++	/* Check HEAD of parent */
++	if (git_buf_joinpath(&path, repo->commondir, GIT_HEAD_FILE) < 0)
++		goto out;
++	if (git_futils_readbuffer(&buf, path.ptr) < 0)
++		goto out;
++	if (git__prefixcmp(buf.ptr, "ref: ") == 0)
++		git_buf_consume(&buf, buf.ptr + strlen("ref: "));
++	git_buf_rtrim(&buf);
++
++	found = git__strcmp(buf.ptr, branch->name) == 0;
++
++out:
++	git_buf_free(&buf);
++	git_buf_free(&path);
++
++	return found;
++}
++
++
+ int git_branch_delete(git_reference *branch)
+ {
+ 	int is_head;
+-- 
+2.8.1.windows.1
+
