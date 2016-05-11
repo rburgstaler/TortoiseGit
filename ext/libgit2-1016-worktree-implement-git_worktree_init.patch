@@ -1,0 +1,237 @@
+From d744223dce82b61f79356433b1765448291cb3f0 Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Fri, 23 Oct 2015 14:11:44 +0200
+Subject: [PATCH 1016/1024] worktree: implement `git_worktree_init`
+
+Implement the `git_worktree_init` function which can be used to
+create new working trees for a given repository.
+---
+ include/git2/worktree.h   | 15 ++++++++
+ src/worktree.c            | 97 ++++++++++++++++++++++++++++++++++++++++++++++-
+ tests/worktree/worktree.c | 63 ++++++++++++++++++++++++++++++
+ 3 files changed, 174 insertions(+), 1 deletion(-)
+
+diff --git a/include/git2/worktree.h b/include/git2/worktree.h
+index dc0cd62..df20bfc 100644
+--- a/include/git2/worktree.h
++++ b/include/git2/worktree.h
+@@ -73,6 +73,21 @@ GIT_EXTERN(void) git_worktree_free(git_worktree *wt);
+  */
+ GIT_EXTERN(int) git_worktree_validate(const git_worktree *wt);
+ 
++/**
++ * Initialize a new working tree
++ *
++ * Initialize a new working tree for the repository, that is
++ * create the required data structures inside the repository and
++ * check out the current HEAD at `path`
++ *
++ * @param out Output pointer containing new working tree
++ * @param repo Repository to create working tree for
++ * @param name Name of the working tree
++ * @param path Path to create working tree at
++ * @return 0 or an error code
++ */
++GIT_EXTERN(int) git_worktree_init(git_worktree **out, git_repository *repo, const char *name, const char *path);
++
+ /** @} */
+ GIT_END_DECL
+ #endif
+diff --git a/src/worktree.c b/src/worktree.c
+index f660099..6a53931 100644
+--- a/src/worktree.c
++++ b/src/worktree.c
+@@ -5,9 +5,12 @@
+  * a Linking Exception. For full terms see the included COPYING file.
+  */
+ 
++#include "common.h"
++
++#include "git2/branch.h"
++#include "git2/commit.h"
+ #include "git2/worktree.h"
+ 
+-#include "common.h"
+ #include "repository.h"
+ #include "worktree.h"
+ 
+@@ -90,6 +93,25 @@ err:
+ 	return NULL;
+ }
+ 
++static int write_wtfile(const char *base, const char *file, const git_buf *buf)
++{
++	git_buf path = GIT_BUF_INIT;
++	int err;
++
++	assert(base && file && buf);
++
++	if ((err = git_buf_joinpath(&path, base, file)) < 0)
++		goto out;
++
++	if ((err = git_futils_writebuffer(buf, path.ptr, O_CREAT|O_EXCL|O_WRONLY, 0644)) < 0)
++		goto out;
++
++out:
++	git_buf_free(&path);
++
++	return err;
++}
++
+ int git_worktree_lookup(git_worktree **out, git_repository *repo, const char *name)
+ {
+ 	git_buf path = GIT_BUF_INIT;
+@@ -218,3 +240,76 @@ out:
+ 
+ 	return err;
+ }
++
++int git_worktree_init(git_worktree **out, git_repository *repo, const char *name, const char *worktree)
++{
++	git_buf path = GIT_BUF_INIT, buf = GIT_BUF_INIT;
++	git_reference *ref = NULL, *head = NULL;
++	git_commit *commit = NULL;
++	git_repository *wt = NULL;
++	git_checkout_options coopts = GIT_CHECKOUT_OPTIONS_INIT;
++	int err;
++
++	assert(out && repo && name && worktree);
++
++	*out = NULL;
++
++	/* Create worktree related files in commondir */
++	if ((err = git_buf_printf(&path, "%s/worktrees/%s", repo->commondir, name)) < 0)
++		goto out;
++
++	/* Create both directories */
++	if ((err = git_futils_mkdir(worktree, 0755, GIT_MKDIR_EXCL)) < 0)
++		goto out;
++	if ((err = git_futils_mkdir(path.ptr, 0755, GIT_MKDIR_EXCL)) < 0)
++		goto out;
++
++	/* Create worktree .git file */
++	if ((err = git_buf_printf(&buf, "gitdir: %s\n", path.ptr)) < 0)
++		goto out;
++	if ((err = write_wtfile(worktree, ".git", &buf)) < 0)
++		goto out;
++
++	/* Create commondir files */
++	if ((err = git_buf_sets(&buf, repo->commondir)) < 0
++	    || (err = git_buf_putc(&buf, '\n')) < 0
++	    || (err = write_wtfile(path.ptr, "commondir", &buf)) < 0)
++		goto out;
++	if ((err = git_buf_sets(&buf, worktree)) < 0
++	    || (err = git_buf_putc(&buf, '\n')) < 0
++	    || (err = write_wtfile(path.ptr, "gitdir", &buf)) < 0)
++		goto out;
++
++	/* Create new branch */
++	if ((err = git_repository_head(&head, repo)) < 0)
++		goto out;
++	if ((err = git_commit_lookup(&commit, repo, &head->target.oid)) < 0)
++		goto out;
++	if ((err = git_branch_create(&ref, repo, name, commit, false)) < 0)
++		goto out;
++
++	/* Set worktree's HEAD */
++	if ((err = git_repository_create_head(path.ptr, name)) < 0)
++		goto out;
++	if ((err = git_repository_open(&wt, worktree)) < 0)
++		goto out;
++
++	/* Checkout worktree's HEAD */
++	coopts.checkout_strategy = GIT_CHECKOUT_FORCE;
++	if ((err = git_checkout_head(wt, &coopts)) < 0)
++		goto out;
++
++	/* Load result */
++	if ((err = git_worktree_lookup(out, repo, name)) < 0)
++		goto out;
++
++out:
++	git_buf_free(&path);
++	git_buf_free(&buf);
++	git_reference_free(ref);
++	git_reference_free(head);
++	git_commit_free(commit);
++	git_repository_free(wt);
++
++	return err;
++}
+diff --git a/tests/worktree/worktree.c b/tests/worktree/worktree.c
+index 1750b9c..06cef24 100644
+--- a/tests/worktree/worktree.c
++++ b/tests/worktree/worktree.c
+@@ -204,6 +204,69 @@ void test_worktree_worktree__open_invalid_parent(void)
+ 	git_worktree_free(wt);
+ }
+ 
++void test_worktree_worktree__init(void)
++{
++	git_worktree *wt;
++	git_repository *repo;
++	git_reference *branch;
++	git_buf path = GIT_BUF_INIT;
++
++	cl_git_pass(git_buf_joinpath(&path, fixture.repo->workdir, "../worktree-new"));
++	cl_git_pass(git_worktree_init(&wt, fixture.repo, "worktree-new", path.ptr));
++
++	/* Open and verify created repo */
++	cl_git_pass(git_repository_open(&repo, path.ptr));
++	cl_git_pass(git_branch_lookup(&branch, repo, "worktree-new", GIT_BRANCH_LOCAL));
++
++	git_buf_free(&path);
++	git_worktree_free(wt);
++	git_reference_free(branch);
++	git_repository_free(repo);
++}
++
++void test_worktree_worktree__init_existing_worktree(void)
++{
++	git_worktree *wt;
++	git_buf path = GIT_BUF_INIT;
++
++	cl_git_pass(git_buf_joinpath(&path, fixture.repo->workdir, "../worktree-new"));
++	cl_git_fail(git_worktree_init(&wt, fixture.repo, "testrepo-worktree", path.ptr));
++
++	cl_git_pass(git_worktree_lookup(&wt, fixture.repo, "testrepo-worktree"));
++	cl_assert(git_path_equal(wt->gitlink_path, fixture.worktree->path_gitlink));
++
++	git_buf_free(&path);
++	git_worktree_free(wt);
++}
++
++void test_worktree_worktree__init_existing_path(void)
++{
++	const char *wtfiles[] = { "HEAD", "commondir", "gitdir", "index" };
++	git_worktree *wt;
++	git_buf path = GIT_BUF_INIT;
++	unsigned i;
++
++	/* Delete files to verify they have not been created by
++	 * the init call */
++	for (i = 0; i < ARRAY_SIZE(wtfiles); i++) {
++		cl_git_pass(git_buf_joinpath(&path,
++			    fixture.worktree->path_repository, wtfiles[i]));
++		cl_git_pass(p_unlink(path.ptr));
++	}
++
++	cl_git_pass(git_buf_joinpath(&path, fixture.repo->workdir, "../testrepo-worktree"));
++	cl_git_fail(git_worktree_init(&wt, fixture.repo, "worktree-new", path.ptr));
++
++	/* Verify files have not been re-created */
++	for (i = 0; i < ARRAY_SIZE(wtfiles); i++) {
++		cl_git_pass(git_buf_joinpath(&path,
++			    fixture.worktree->path_repository, wtfiles[i]));
++		cl_assert(!git_path_exists(path.ptr));
++	}
++
++	git_buf_free(&path);
++}
++
+ void test_worktree_worktree__validate(void)
+ {
+ 	git_worktree *wt;
+-- 
+2.8.1.windows.1
+

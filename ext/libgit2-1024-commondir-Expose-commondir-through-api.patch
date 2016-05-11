@@ -1,0 +1,68 @@
+From e6b1db4542af9ba752f039699bc7a7c69576882a Mon Sep 17 00:00:00 2001
+From: Rick Burgstaler <rburgstaler@yahoo.com>
+Date: Tue, 9 Feb 2016 23:34:46 -0600
+Subject: [PATCH 1024/1024] commondir: Expose commondir through api Give
+ external application access to the commondir used with multiple worktrees.
+ Improve the documentation regarding git_repository_path for case of when the
+ repository is a linked working tree.
+
+---
+ include/git2/repository.h | 17 +++++++++++++++++
+ src/repository.c          |  6 ++++++
+ 2 files changed, 23 insertions(+)
+
+diff --git a/include/git2/repository.h b/include/git2/repository.h
+index a6a56c1..306765c 100644
+--- a/include/git2/repository.h
++++ b/include/git2/repository.h
+@@ -356,6 +356,9 @@ GIT_EXTERN(int) git_repository_is_empty(git_repository *repo);
+  *
+  * This is the path of the `.git` folder for normal repositories,
+  * or of the repository itself for bare repositories.
++ * In the case of a linked working tree, this is the path to the 
++ * private directory under `.git/worktrees/` direcotry in the
++ * main working tree.
+  *
+  * @param repo A repository object
+  * @return the path to the repository
+@@ -363,6 +366,20 @@ GIT_EXTERN(int) git_repository_is_empty(git_repository *repo);
+ GIT_EXTERN(const char *) git_repository_path(git_repository *repo);
+ 
+ /**
++* Get the path of this repository's common directory
++*
++* This is the path of the `.git` folder for normal repositories,
++* or of the repository itself for bare repositories.
++* In the case of a linked working tree, this is the path back to the 
++* main working tree’s `.git` folder.
++*
++* @param repo A repository object
++* @return the path to the commondir of the repository
++*/
++GIT_EXTERN(const char *) git_repository_commondir(git_repository *repo);
++
++
++/**
+  * Get the path of the working directory for this repository
+  *
+  * If the repository is bare, this function will always return
+diff --git a/src/repository.c b/src/repository.c
+index 6c3b513..6f1e1a9 100644
+--- a/src/repository.c
++++ b/src/repository.c
+@@ -1863,6 +1863,12 @@ const char *git_repository_path(git_repository *repo)
+ 	return repo->path_repository;
+ }
+ 
++const char *git_repository_commondir(git_repository *repo)
++{
++	assert(repo);
++	return repo->commondir;
++}
++
+ const char *git_repository_workdir(git_repository *repo)
+ {
+ 	assert(repo);
+-- 
+2.8.1.windows.1
+
