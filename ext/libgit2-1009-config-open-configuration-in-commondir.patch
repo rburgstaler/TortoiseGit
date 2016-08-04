@@ -1,0 +1,82 @@
+From 6562efcc04f3cf9f22496fd5371379c036fba11d Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Thu, 24 Sep 2015 14:37:10 +0200
+Subject: [PATCH 1009/1024] config: open configuration in commondir
+
+A repository's configuartion file can always be found in the
+GIT_COMMON_DIR, which has been newly introduced. For normal
+repositories this does change nothing, but for working trees this
+change allows to access the shared configuration file.
+---
+ src/repository.c        |  2 +-
+ tests/worktree/config.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 46 insertions(+), 1 deletion(-)
+ create mode 100644 tests/worktree/config.c
+
+diff --git a/src/repository.c b/src/repository.c
+index bcdd57d..93b5bfe 100644
+--- a/src/repository.c
++++ b/src/repository.c
+@@ -829,7 +829,7 @@ static int load_config(
+ 		return error;
+ 
+ 	error = git_buf_joinpath(
+-		&config_path, repo->path_repository, GIT_CONFIG_FILENAME_INREPO);
++		&config_path, repo->commondir, GIT_CONFIG_FILENAME_INREPO);
+ 	if (error < 0)
+ 		goto on_error;
+ 
+diff --git a/tests/worktree/config.c b/tests/worktree/config.c
+new file mode 100644
+index 0000000..3ab317b
+--- /dev/null
++++ b/tests/worktree/config.c
+@@ -0,0 +1,45 @@
++#include "clar_libgit2.h"
++#include "worktree_helpers.h"
++
++#define COMMON_REPO "testrepo"
++#define WORKTREE_REPO "testrepo-worktree"
++
++static worktree_fixture fixture =
++	WORKTREE_FIXTURE_INIT(COMMON_REPO, WORKTREE_REPO);
++
++void test_worktree_config__initialize(void)
++{
++	setup_fixture_worktree(&fixture);
++}
++
++void test_worktree_config__cleanup(void)
++{
++	cleanup_fixture_worktree(&fixture);
++}
++
++void test_worktree_config__open(void)
++{
++	git_config *cfg;
++
++	cl_git_pass(git_repository_config(&cfg, fixture.worktree));
++	cl_assert(cfg != NULL);
++
++	git_config_free(cfg);
++}
++
++void test_worktree_config__set(void)
++{
++	git_config *cfg;
++	int32_t val;
++
++	cl_git_pass(git_repository_config(&cfg, fixture.worktree));
++	cl_git_pass(git_config_set_int32(cfg, "core.dummy", 5));
++	git_config_free(cfg);
++
++	// reopen to verify configuration has been set in the
++	// common dir
++	cl_git_pass(git_repository_config(&cfg, fixture.repo));
++	cl_git_pass(git_config_get_int32(&val, cfg, "core.dummy"));
++	cl_assert_equal_i(val, 5);
++	git_config_free(cfg);
++}
+-- 
+2.9.0.windows.1
+

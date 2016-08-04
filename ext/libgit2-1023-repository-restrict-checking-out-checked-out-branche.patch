@@ -1,0 +1,79 @@
+From 2582aab58b54cfe219251326ba024ce6f301fb95 Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Tue, 27 Oct 2015 14:17:52 +0100
+Subject: [PATCH 1023/1024] repository: restrict checking out checked out
+ branches
+
+If a branch is already checked out in a working tree we are not
+allowed to check out that branch in another repository. Introduce
+this restriction when setting a repository's HEAD.
+---
+ src/repository.c      |  8 ++++++++
+ tests/worktree/refs.c | 25 +++++++++++++++++++++++++
+ 2 files changed, 33 insertions(+)
+
+diff --git a/src/repository.c b/src/repository.c
+index 305879e..8ab2b09 100644
+--- a/src/repository.c
++++ b/src/repository.c
+@@ -27,6 +27,7 @@
+ #include "merge.h"
+ #include "diff_driver.h"
+ #include "annotated_commit.h"
++#include "worktree.h"
+ 
+ #ifdef GIT_WIN32
+ # include "win32/w32_util.h"
+@@ -2333,6 +2334,13 @@ int git_repository_set_head(
+ 	if (error < 0 && error != GIT_ENOTFOUND)
+ 		goto cleanup;
+ 
++	if (ref && current->type == GIT_REF_SYMBOLIC && git__strcmp(current->target.symbolic, ref->name)
++		&& git_reference_is_branch(ref) && git_branch_is_checked_out(ref))
++	{
++		error = -1;
++		goto cleanup;
++	}
++
+ 	if (!error) {
+ 		if (git_reference_is_branch(ref)) {
+ 			error = git_reference_symbolic_create(&new_head, repo, GIT_HEAD_FILE,
+diff --git a/tests/worktree/refs.c b/tests/worktree/refs.c
+index 963c940..4862bac 100644
+--- a/tests/worktree/refs.c
++++ b/tests/worktree/refs.c
+@@ -67,6 +67,31 @@ void test_worktree_refs__read_head(void)
+ 	git_reference_free(head);
+ }
+ 
++void test_worktree_refs__set_head_Fails_when_worktree_wants_linked_repos_HEAD(void)
++{
++	git_reference *head;
++
++	cl_git_pass(git_repository_head(&head, fixture.repo));
++	cl_git_fail(git_repository_set_head(fixture.worktree, git_reference_name(head)));
++
++	git_reference_free(head);
++}
++
++void test_worktree_refs__set_head_Works_for_current_HEAD(void)
++{
++	git_reference *head;
++
++	cl_git_pass(git_repository_head(&head, fixture.repo));
++	cl_git_pass(git_repository_set_head(fixture.repo, git_reference_name(head)));
++
++	git_reference_free(head);
++}
++
++void test_worktree_refs__set_head_Fails_when_already_checked_out(void)
++{
++	cl_git_fail(git_repository_set_head(fixture.repo, "refs/heads/testrepo-worktree"));
++}
++
+ void test_worktree_refs__delete_fails_for_checked_out_branch(void)
+ {
+        git_reference *branch;
+-- 
+2.9.0.windows.1
+

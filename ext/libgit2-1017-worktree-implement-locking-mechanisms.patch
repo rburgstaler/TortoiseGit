@@ -1,0 +1,240 @@
+From 6a4a17a4f2b6138a177f581811404bbdb55dbaa4 Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Wed, 21 Oct 2015 16:03:04 +0200
+Subject: [PATCH 1017/1024] worktree: implement locking mechanisms
+
+Working trees support locking by creating a file `locked` inside
+the tree's gitdir with an optional reason inside. Support this
+feature by adding functions to get and set the locking status.
+---
+ include/git2/worktree.h   | 36 +++++++++++++++++++++++
+ src/worktree.c            | 73 +++++++++++++++++++++++++++++++++++++++++++++++
+ src/worktree.h            |  2 ++
+ tests/worktree/worktree.c | 59 ++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 170 insertions(+)
+
+diff --git a/include/git2/worktree.h b/include/git2/worktree.h
+index df20bfc..860225e 100644
+--- a/include/git2/worktree.h
++++ b/include/git2/worktree.h
+@@ -8,6 +8,7 @@
+ #define INCLUDE_git_worktree_h__
+ 
+ #include "common.h"
++#include "buffer.h"
+ #include "types.h"
+ #include "strarray.h"
+ 
+@@ -88,6 +89,41 @@ GIT_EXTERN(int) git_worktree_validate(const git_worktree *wt);
+  */
+ GIT_EXTERN(int) git_worktree_init(git_worktree **out, git_repository *repo, const char *name, const char *path);
+ 
++/*
++ * Lock worktree if not already locked
++ *
++ * Lock a worktree, optionally specifying a reason why the linked
++ * working tree is being locked.
++ *
++ * @param wt Worktree to lock
++ * @param reason Reason why the working tree is being locked
++ * @return 0 on success, non-zero otherwise
++ */
++GIT_EXTERN(int) git_worktree_lock(git_worktree *wt, char *reason);
++
++/**
++ * Unlock a locked worktree
++ *
++ * @param wt Worktree to unlock
++ * @return 0 on success, 1 if worktree was not locked, error-code
++ *  otherwise
++ */
++GIT_EXTERN(int) git_worktree_unlock(git_worktree *wt);
++
++/**
++ * Check if worktree is locked
++ *
++ * A worktree may be locked if the linked working tree is stored
++ * on a portable device which is not available.
++ *
++ * @param reason Buffer to store reason in. If NULL no reason is stored.
++ * @param wt Worktree to check
++ * @return 0 when the working tree not locked, a value greater
++ *  than zero if it is locked, less than zero if there was an
++ *  error
++ */
++GIT_EXTERN(int) git_worktree_is_locked(git_buf *reason, const git_worktree *wt);
++
+ /** @} */
+ GIT_END_DECL
+ #endif
+diff --git a/src/worktree.c b/src/worktree.c
+index 6a53931..baaa86a 100644
+--- a/src/worktree.c
++++ b/src/worktree.c
+@@ -143,6 +143,7 @@ int git_worktree_lookup(git_worktree **out, git_repository *repo, const char *na
+ 		goto out;
+ 	}
+ 	wt->gitdir_path = git_buf_detach(&path);
++	wt->locked = !!git_worktree_is_locked(NULL, wt);
+ 
+ 	(*out) = wt;
+ 
+@@ -313,3 +314,75 @@ out:
+ 
+ 	return err;
+ }
++
++int git_worktree_lock(git_worktree *wt, char *creason)
++{
++	git_buf buf = GIT_BUF_INIT, path = GIT_BUF_INIT;
++	int err;
++
++	assert(wt);
++
++	if ((err = git_worktree_is_locked(NULL, wt)) < 0)
++		goto out;
++
++	if ((err = git_buf_joinpath(&path, wt->gitdir_path, "locked")) < 0)
++		goto out;
++
++	if (creason)
++		git_buf_attach_notowned(&buf, creason, strlen(creason));
++
++	if ((err = git_futils_writebuffer(&buf, path.ptr, O_CREAT|O_EXCL|O_WRONLY, 0644)) < 0)
++		goto out;
++
++	wt->locked = 1;
++
++out:
++	git_buf_free(&path);
++
++	return err;
++}
++
++int git_worktree_unlock(git_worktree *wt)
++{
++	git_buf path = GIT_BUF_INIT;
++
++	assert(wt);
++
++	if (!git_worktree_is_locked(NULL, wt))
++		return 1;
++
++	if (git_buf_joinpath(&path, wt->gitdir_path, "locked") < 0)
++		return -1;
++
++	if (p_unlink(path.ptr) != 0) {
++		git_buf_free(&path);
++		return -1;
++	}
++
++	wt->locked = 0;
++
++	git_buf_free(&path);
++
++	return 0;
++}
++
++int git_worktree_is_locked(git_buf *reason, const git_worktree *wt)
++{
++	git_buf path = GIT_BUF_INIT;
++	int ret;
++
++	assert(wt);
++
++	if (reason)
++		git_buf_clear(reason);
++
++	if ((ret = git_buf_joinpath(&path, wt->gitdir_path, "locked")) < 0)
++		goto out;
++	if ((ret = git_path_exists(path.ptr)) && reason)
++		git_futils_readbuffer(reason, path.ptr);
++
++out:
++	git_buf_free(&path);
++
++	return ret;
++}
+diff --git a/src/worktree.h b/src/worktree.h
+index 0e1666c..0e1a88d 100644
+--- a/src/worktree.h
++++ b/src/worktree.h
+@@ -26,6 +26,8 @@ struct git_worktree {
+ 	char *commondir_path;
+ 	/* Path to the parent's .git directory */
+ 	char *parent_path;
++
++	int locked:1;
+ };
+ 
+ #endif
+diff --git a/tests/worktree/worktree.c b/tests/worktree/worktree.c
+index 06cef24..f19004b 100644
+--- a/tests/worktree/worktree.c
++++ b/tests/worktree/worktree.c
+@@ -316,3 +316,62 @@ void test_worktree_worktree__validate_invalid_parent(void)
+ 	wt->parent_path = NULL;
+ 	git_worktree_free(wt);
+ }
++
++void test_worktree_worktree__lock_with_reason(void)
++{
++	git_worktree *wt;
++	git_buf reason = GIT_BUF_INIT;
++
++	cl_git_pass(git_worktree_lookup(&wt, fixture.repo, "testrepo-worktree"));
++
++	cl_assert(!git_worktree_is_locked(NULL, wt));
++	cl_git_pass(git_worktree_lock(wt, "because"));
++	cl_assert(git_worktree_is_locked(&reason, wt) > 0);
++	cl_assert_equal_s(reason.ptr, "because");
++	cl_assert(wt->locked);
++
++	git_buf_free(&reason);
++	git_worktree_free(wt);
++}
++
++void test_worktree_worktree__lock_without_reason(void)
++{
++	git_worktree *wt;
++	git_buf reason = GIT_BUF_INIT;
++
++	cl_git_pass(git_worktree_lookup(&wt, fixture.repo, "testrepo-worktree"));
++
++	cl_assert(!git_worktree_is_locked(NULL, wt));
++	cl_git_pass(git_worktree_lock(wt, NULL));
++	cl_assert(git_worktree_is_locked(&reason, wt) > 0);
++	cl_assert_equal_i(reason.size, 0);
++	cl_assert(wt->locked);
++
++	git_buf_free(&reason);
++	git_worktree_free(wt);
++}
++
++void test_worktree_worktree__unlock_unlocked_worktree(void)
++{
++	git_worktree *wt;
++
++	cl_git_pass(git_worktree_lookup(&wt, fixture.repo, "testrepo-worktree"));
++	cl_assert(!git_worktree_is_locked(NULL, wt));
++	cl_assert(git_worktree_unlock(wt) == 1);
++	cl_assert(!wt->locked);
++
++	git_worktree_free(wt);
++}
++
++void test_worktree_worktree__unlock_locked_worktree(void)
++{
++	git_worktree *wt;
++
++	cl_git_pass(git_worktree_lookup(&wt, fixture.repo, "testrepo-worktree"));
++	cl_git_pass(git_worktree_lock(wt, NULL));
++	cl_assert(git_worktree_is_locked(NULL, wt));
++	cl_git_pass(git_worktree_unlock(wt));
++	cl_assert(!wt->locked);
++
++	git_worktree_free(wt);
++}
+-- 
+2.9.0.windows.1
+

@@ -1,0 +1,306 @@
+From 23c0dd550222fe0a0b4cbff9973acde9d5cd7755 Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Mon, 9 Nov 2015 17:00:41 +0100
+Subject: [PATCH 1001/1024] tests: add submodule worktree test data
+
+Create worktrees for submodule repositories. The worktrees are
+created for the parent repository (e.g. the one containing
+submodules) and for the contained child repository.
+---
+ tests/resources/submodules-worktree-child/.gitted         | Bin 0 -> 72 bytes
+ tests/resources/submodules-worktree-child/README          | Bin 0 -> 10 bytes
+ tests/resources/submodules-worktree-child/branch_file.txt | Bin 0 -> 8 bytes
+ tests/resources/submodules-worktree-child/new.txt         | Bin 0 -> 12 bytes
+ tests/resources/submodules-worktree-parent/.gitmodules    | Bin 0 -> 98 bytes
+ tests/resources/submodules-worktree-parent/.gitted        | Bin 0 -> 64 bytes
+ tests/resources/submodules-worktree-parent/deleted        | Bin 0 -> 3 bytes
+ tests/resources/submodules-worktree-parent/modified       | Bin 0 -> 3 bytes
+ tests/resources/submodules-worktree-parent/unmodified     | Bin 0 -> 3 bytes
+ .../.gitted/logs/refs/heads/submodules-worktree-parent    | Bin 0 -> 156 bytes
+ .../.gitted/refs/heads/submodules-worktree-parent         | Bin 0 -> 41 bytes
+ .../.gitted/worktrees/submodules-worktree-parent/HEAD     | Bin 0 -> 43 bytes
+ .../worktrees/submodules-worktree-parent/ORIG_HEAD        | Bin 0 -> 41 bytes
+ .../worktrees/submodules-worktree-parent/commondir        | Bin 0 -> 6 bytes
+ .../.gitted/worktrees/submodules-worktree-parent/gitdir   | Bin 0 -> 44 bytes
+ .../.gitted/worktrees/submodules-worktree-parent/index    | Bin 0 -> 441 bytes
+ .../.gitted/logs/refs/heads/submodules-worktree-child     | Bin 0 -> 156 bytes
+ .../testrepo/.gitted/refs/heads/submodules-worktree-child | Bin 0 -> 41 bytes
+ .../.gitted/worktrees/submodules-worktree-child/HEAD      | Bin 0 -> 42 bytes
+ .../.gitted/worktrees/submodules-worktree-child/ORIG_HEAD | Bin 0 -> 41 bytes
+ .../.gitted/worktrees/submodules-worktree-child/commondir | Bin 0 -> 6 bytes
+ .../.gitted/worktrees/submodules-worktree-child/gitdir    | Bin 0 -> 46 bytes
+ .../.gitted/worktrees/submodules-worktree-child/index     | Bin 0 -> 289 bytes
+ 23 files changed, 0 insertions(+), 0 deletions(-)
+ create mode 100644 tests/resources/submodules-worktree-child/.gitted
+ create mode 100644 tests/resources/submodules-worktree-child/README
+ create mode 100644 tests/resources/submodules-worktree-child/branch_file.txt
+ create mode 100644 tests/resources/submodules-worktree-child/new.txt
+ create mode 100644 tests/resources/submodules-worktree-parent/.gitmodules
+ create mode 100644 tests/resources/submodules-worktree-parent/.gitted
+ create mode 100644 tests/resources/submodules-worktree-parent/deleted
+ create mode 100644 tests/resources/submodules-worktree-parent/modified
+ create mode 100644 tests/resources/submodules-worktree-parent/unmodified
+ create mode 100644 tests/resources/submodules/.gitted/logs/refs/heads/submodules-worktree-parent
+ create mode 100644 tests/resources/submodules/.gitted/refs/heads/submodules-worktree-parent
+ create mode 100644 tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/HEAD
+ create mode 100644 tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/ORIG_HEAD
+ create mode 100644 tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/commondir
+ create mode 100644 tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/gitdir
+ create mode 100644 tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/index
+ create mode 100644 tests/resources/submodules/testrepo/.gitted/logs/refs/heads/submodules-worktree-child
+ create mode 100644 tests/resources/submodules/testrepo/.gitted/refs/heads/submodules-worktree-child
+ create mode 100644 tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/HEAD
+ create mode 100644 tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/ORIG_HEAD
+ create mode 100644 tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/commondir
+ create mode 100644 tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/gitdir
+ create mode 100644 tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/index
+
+diff --git a/tests/resources/submodules-worktree-child/.gitted b/tests/resources/submodules-worktree-child/.gitted
+new file mode 100644
+index 0000000000000000000000000000000000000000..03286f522907adee181866b2b81be0fcc4ab6979
+GIT binary patch
+literal 72
+zcmYe#EJ?{MvQp5~(=RSf%FRzH%}FiRFG(#fDM~HK*VjwWEYUB|FUkgTf#L`yx-dcA
+K<c!Rm6fOYVZW~kp
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules-worktree-child/README b/tests/resources/submodules-worktree-child/README
+new file mode 100644
+index 0000000000000000000000000000000000000000..a8233120f6ad708f843d861ce2b7228ec4e3dec6
+GIT binary patch
+literal 10
+Rcmc~utyCz<NG(d`0ss`v1Bn0t
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules-worktree-child/branch_file.txt b/tests/resources/submodules-worktree-child/branch_file.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..3697d64be941a53d4ae8f6a271e4e3fa56b022cc
+GIT binary patch
+literal 8
+Pcmd1E<VvbcRpbHy3#<Z1
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules-worktree-child/new.txt b/tests/resources/submodules-worktree-child/new.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..a71586c1dfe8a71c6cbf6c129f404c5642ff31bd
+GIT binary patch
+literal 12
+Tcmd0;RLDy$S4hjuN#z0n99#q&
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules-worktree-parent/.gitmodules b/tests/resources/submodules-worktree-parent/.gitmodules
+new file mode 100644
+index 0000000000000000000000000000000000000000..78308c9251cf4eee8b25a76c7d2790c73d797357
+GIT binary patch
+literal 98
+zcmazpE=|hKPbtkwRZuEPEiNfaEy!1j<>D+zEXh!?Re%X`ah4Y40Qvf%#i>Qb`bA0l
+k#YM^bIhjf6nI%U0AXPxY)Z+ZoqU6+KFdt-)9#EDG0J8cc9RL6T
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules-worktree-parent/.gitted b/tests/resources/submodules-worktree-parent/.gitted
+new file mode 100644
+index 0000000000000000000000000000000000000000..87bd9ae29417dc439261769d615e7c45db0ddf0e
+GIT binary patch
+literal 64
+zcmYe#EJ?{MvQp5~(=RSf%FRzH%}FiR*GtbV(J#+0$}TBN1#%HGx-dcAg2bZKyb>+|
+D1@{;=
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules-worktree-parent/deleted b/tests/resources/submodules-worktree-parent/deleted
+new file mode 100644
+index 0000000000000000000000000000000000000000..092bfb9bdf74dd8cfd22e812151281ee9aa6f01a
+GIT binary patch
+literal 3
+Kcmb=-=K=r%Rsiz=
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules-worktree-parent/modified b/tests/resources/submodules-worktree-parent/modified
+new file mode 100644
+index 0000000000000000000000000000000000000000..092bfb9bdf74dd8cfd22e812151281ee9aa6f01a
+GIT binary patch
+literal 3
+Kcmb=-=K=r%Rsiz=
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules-worktree-parent/unmodified b/tests/resources/submodules-worktree-parent/unmodified
+new file mode 100644
+index 0000000000000000000000000000000000000000..092bfb9bdf74dd8cfd22e812151281ee9aa6f01a
+GIT binary patch
+literal 3
+Kcmb=-=K=r%Rsiz=
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules/.gitted/logs/refs/heads/submodules-worktree-parent b/tests/resources/submodules/.gitted/logs/refs/heads/submodules-worktree-parent
+new file mode 100644
+index 0000000000000000000000000000000000000000..65e98853528b8ebec8b75c1e91a28d34eaa32150
+GIT binary patch
+literal 156
+zcma*UK?=e!5Czb+o?`Zb{KRQGDI$srE(K38NmCk1Ye{o|yn^om{~_OscVZAu*1$5W
+zvnrMw36dbjr#M6>4d|`4<T%l%ro4<=`by_@yROrA%=3i|a|>b1paTrB3q_YWc62XE
+PYwBqz-<e*|+hhL&LiH$j
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules/.gitted/refs/heads/submodules-worktree-parent b/tests/resources/submodules/.gitted/refs/heads/submodules-worktree-parent
+new file mode 100644
+index 0000000000000000000000000000000000000000..32b935853701f9b5a0ff56cde617a37403860cc8
+GIT binary patch
+literal 41
+ucmV~$!4Uu;2m`Rc(?CTm;{b>Ik6;p);Z&&&6_}+X2|Fx~P-FVF^T_(jQ3>Y&
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/HEAD b/tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/HEAD
+new file mode 100644
+index 0000000000000000000000000000000000000000..a07134b85d6c4da0beff679a9ad6fa1680941235
+GIT binary patch
+literal 43
+ycmXR)O|w!cN=+-)&qz&7Db_D8P0GzrDa}bO)-BI3$}TBNP1P+(EK1EQ;Q|0;=nzi;
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/ORIG_HEAD b/tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/ORIG_HEAD
+new file mode 100644
+index 0000000000000000000000000000000000000000..32b935853701f9b5a0ff56cde617a37403860cc8
+GIT binary patch
+literal 41
+ucmV~$!4Uu;2m`Rc(?CTm;{b>Ik6;p);Z&&&6_}+X2|Fx~P-FVF^T_(jQ3>Y&
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/commondir b/tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/commondir
+new file mode 100644
+index 0000000000000000000000000000000000000000..aab0408ceca61b98818f783c76b074312fd5cd80
+GIT binary patch
+literal 6
+NcmdPX)7R7E0ssT70P+9;
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/gitdir b/tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/gitdir
+new file mode 100644
+index 0000000000000000000000000000000000000000..eaaf13b9560a93c6923755353b00b9ca611834d3
+GIT binary patch
+literal 44
+scmdPX)7OKc;?ktt{FKt1)MDN8{G#lVqSRE~g2bZKyb^uA^vn`204c~0asU7T
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/index b/tests/resources/submodules/.gitted/worktrees/submodules-worktree-parent/index
+new file mode 100644
+index 0000000000000000000000000000000000000000..5b68f18a4c0d3a4d650a5186d49be9a1ecffaec7
+GIT binary patch
+literal 441
+zcmZ?q402{*U|<4b)-Z<y7c|f95{1zW4F4Dzc5t#XFf=Y<U|@a$!3;?i20fDk&-=aW
+zR$ZP`t3KhlZDnyd1Gip!W=U>-N@-4NG0-p&fSCiMq2{rnna9kj{d@NPlDj>Bm0k#m
+z3N^l)wd{iw1A9tpPHIVN3T|`Qi86-+=%&oHOprk^cfe?{dv-DJVPJRwv<2or0fuGq
+zZ$Hm^|AguC?mU(IzW(t~LdpXeI7(8BONvqp@^P56gOh_O_i&ZwAzTEs76?LuTwQ^b
+zB!j7f0oOMEn{Ao1m%Mz|{fhm3U!}c~-H#6a_kY*%7oYb#5Wb9mVnJ7ux!ndg02ouA
+A1ONa4
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules/testrepo/.gitted/logs/refs/heads/submodules-worktree-child b/tests/resources/submodules/testrepo/.gitted/logs/refs/heads/submodules-worktree-child
+new file mode 100644
+index 0000000000000000000000000000000000000000..dd4650ff8b2465e234a5311d83ef4484fab5974b
+GIT binary patch
+literal 156
+zcma*cOA5j;5CG7%o?`ZbOw&oDMWmvFOTiONIx{qsen@kF^a#G~L;MeL<4witGpi|~
+zlRCym9f^^U{f<0^;1S+ja_UF;6ixHMSqfa%ty{<Kn5HXKL;+9ayn_Q)h`X41?uQoc
+QS-Gfy<z<4`^Y++(0Sx{sS^xk5
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules/testrepo/.gitted/refs/heads/submodules-worktree-child b/tests/resources/submodules/testrepo/.gitted/refs/heads/submodules-worktree-child
+new file mode 100644
+index 0000000000000000000000000000000000000000..3d8f0a402b492c248b12ac72b6a66eebe941023f
+GIT binary patch
+literal 41
+vcmYc^GfhiPNi()gOifEQF)&IoPD(OMH8M#_Gf6Q?1In40nwXoL8gKys2{Q}F
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/HEAD b/tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/HEAD
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef82bd4df6ab21ca6a3ebdc656b137e6470898e0
+GIT binary patch
+literal 42
+xcmXR)O|w!cN=+-)&qz&7Db_D8P0GzrDa}bO)-BI3$}TBNP1Q}#$jnLM0svFt56J)k
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/ORIG_HEAD b/tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/ORIG_HEAD
+new file mode 100644
+index 0000000000000000000000000000000000000000..3d8f0a402b492c248b12ac72b6a66eebe941023f
+GIT binary patch
+literal 41
+vcmYc^GfhiPNi()gOifEQF)&IoPD(OMH8M#_Gf6Q?1In40nwXoL8gKys2{Q}F
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/commondir b/tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/commondir
+new file mode 100644
+index 0000000000000000000000000000000000000000..aab0408ceca61b98818f783c76b074312fd5cd80
+GIT binary patch
+literal 6
+NcmdPX)7R7E0ssT70P+9;
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/gitdir b/tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/gitdir
+new file mode 100644
+index 0000000000000000000000000000000000000000..b0ef96e11b3d2430c3840636b0651fab76643461
+GIT binary patch
+literal 46
+rcmdPX)7L{n#idEP`6;D2sl~eG`9;|!MX9N}$r+hBDf)WpnI&8RG7=7V
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/index b/tests/resources/submodules/testrepo/.gitted/worktrees/submodules-worktree-child/index
+new file mode 100644
+index 0000000000000000000000000000000000000000..52a42f966e58085c7bfb2f503192cb4b8e29812e
+GIT binary patch
+literal 289
+zcmZ?q402{*U|<4b<}il?cQ`DT&xg?r4F4Dzb}{c~U}#(dlzsuh3|uRe4HdqvE$DBt
+zZIgMlU8(QL<9o*#*n(UgU3^`E<}kqY!)T~E2hhynFq?kO`=#SjTdx=278O2u{3~pO
+z(isN+q@u*U<c#>V%$!ucl8O@C<{d;ck7v1P+rj%UmdoVq&k>sM;1lNb-*7JjdtPce
+z)SQqYSCIQ88H^PSxTg5<=lT9}jEu|MeD2L{k+1v@8<TFkZ?V<cG}q*IbYz=#uGtN%
+HzGH3xdDv)z
+
+literal 0
+HcmV?d00001
+
+-- 
+2.9.0.windows.1
+

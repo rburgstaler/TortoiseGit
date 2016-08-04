@@ -1,0 +1,317 @@
+From 50ab57f0ee2d61e4edb32bb6043f30f057cd79ac Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Wed, 16 Sep 2015 12:10:11 +0200
+Subject: [PATCH 1004/1024] repository: introduce commondir variable
+
+The commondir variable stores the path to the common directory.
+The common directory is used to store objects and references
+shared across multiple repositories. A current use case is the
+newly introduced `git worktree` feature, which sets up a separate
+working copy, where the backing git object store and references
+are pointed to by the common directory.
+---
+ src/repository.c      | 72 +++++++++++++++++++++++++++++++++++++++------------
+ src/repository.h      |  1 +
+ tests/worktree/open.c | 60 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 117 insertions(+), 16 deletions(-)
+ create mode 100644 tests/worktree/open.c
+
+diff --git a/src/repository.c b/src/repository.c
+index ecc0780..f08dd9e 100644
+--- a/src/repository.c
++++ b/src/repository.c
+@@ -34,6 +34,8 @@
+ 
+ static int check_repositoryformatversion(git_config *config);
+ 
++#define GIT_COMMONDIR_FILE "commondir"
++
+ #define GIT_FILE_CONTENT_PREFIX "gitdir:"
+ 
+ #define GIT_BRANCH_MASTER "master"
+@@ -138,6 +140,7 @@ void git_repository_free(git_repository *repo)
+ 
+ 	git__free(repo->path_gitlink);
+ 	git__free(repo->path_repository);
++	git__free(repo->commondir);
+ 	git__free(repo->workdir);
+ 	git__free(repo->namespace);
+ 	git__free(repo->ident_name);
+@@ -152,17 +155,37 @@ void git_repository_free(git_repository *repo)
+  *
+  * Open a repository object from its path
+  */
+-static bool valid_repository_path(git_buf *repository_path)
++static bool valid_repository_path(git_buf *repository_path, git_buf *common_path)
+ {
+-	/* Check OBJECTS_DIR first, since it will generate the longest path name */
+-	if (git_path_contains_dir(repository_path, GIT_OBJECTS_DIR) == false)
+-		return false;
++	/* Check if we have a separate commondir (e.g. we have a
++	 * worktree) */
++	if (git_path_contains_file(repository_path, GIT_COMMONDIR_FILE)) {
++		git_buf common_link  = GIT_BUF_INIT;
++		git_buf_joinpath(&common_link, repository_path->ptr, GIT_COMMONDIR_FILE);
++
++		git_futils_readbuffer(&common_link, common_link.ptr);
++		git_buf_rtrim(&common_link);
++
++		if (git_path_is_relative(common_link.ptr)) {
++			git_buf_joinpath(common_path, repository_path->ptr, common_link.ptr);
++		} else {
++			git_buf_swap(common_path, &common_link);
++		}
++
++		git_buf_free(&common_link);
++	}
++	else {
++		git_buf_set(common_path, repository_path->ptr, repository_path->size);
++	}
+ 
+ 	/* Ensure HEAD file exists */
+ 	if (git_path_contains_file(repository_path, GIT_HEAD_FILE) == false)
+ 		return false;
+ 
+-	if (git_path_contains_dir(repository_path, GIT_REFS_DIR)  == false)
++	/* Check files in common dir */
++	if (git_path_contains_dir(common_path, GIT_OBJECTS_DIR) == false)
++		return false;
++	if (git_path_contains_dir(common_path, GIT_REFS_DIR) == false)
+ 		return false;
+ 
+ 	return true;
+@@ -351,12 +374,13 @@ static int find_repo(
+ 	git_buf *repo_path,
+ 	git_buf *parent_path,
+ 	git_buf *link_path,
++	git_buf *common_path,
+ 	const char *start_path,
+ 	uint32_t flags,
+ 	const char *ceiling_dirs)
+ {
+ 	int error;
+-	git_buf path = GIT_BUF_INIT;
++	git_buf path = GIT_BUF_INIT, common_link = GIT_BUF_INIT;
+ 	git_buf repo_link = GIT_BUF_INIT;
+ 	struct stat st;
+ 	dev_t initial_device = 0;
+@@ -404,9 +428,13 @@ static int find_repo(
+ 				break;
+ 
+ 			if (S_ISDIR(st.st_mode)) {
+-				if (valid_repository_path(&path)) {
++				if (valid_repository_path(&path, &common_link)) {
+ 					git_path_to_dir(&path);
+ 					git_buf_set(repo_path, path.ptr, path.size);
++
++					if (common_path)
++						git_buf_swap(&common_link, common_path);
++
+ 					break;
+ 				}
+ 			}
+@@ -414,11 +442,13 @@ static int find_repo(
+ 				error = read_gitfile(&repo_link, path.ptr);
+ 				if (error < 0)
+ 					break;
+-				if (valid_repository_path(&repo_link)) {
++					if (valid_repository_path(&repo_link, &common_link)) {
+ 					git_buf_swap(repo_path, &repo_link);
+ 
+ 					if (link_path)
+ 						error = git_buf_put(link_path, path.ptr, path.size);
++					if (common_path)
++						git_buf_swap(&common_link, common_path);
+ 				}
+ 				break;
+ 			}
+@@ -465,6 +495,7 @@ static int find_repo(
+ 
+ 	git_buf_free(&path);
+ 	git_buf_free(&repo_link);
++	git_buf_free(&common_link);
+ 	return error;
+ }
+ 
+@@ -473,14 +504,15 @@ int git_repository_open_bare(
+ 	const char *bare_path)
+ {
+ 	int error;
+-	git_buf path = GIT_BUF_INIT;
++	git_buf path = GIT_BUF_INIT, common_path = GIT_BUF_INIT;
+ 	git_repository *repo = NULL;
+ 
+ 	if ((error = git_path_prettify_dir(&path, bare_path, NULL)) < 0)
+ 		return error;
+ 
+-	if (!valid_repository_path(&path)) {
++	if (!valid_repository_path(&path, &common_path)) {
+ 		git_buf_free(&path);
++		git_buf_free(&common_path);
+ 		giterr_set(GITERR_REPOSITORY, "Path is not a repository: %s", bare_path);
+ 		return GIT_ENOTFOUND;
+ 	}
+@@ -490,6 +522,8 @@ int git_repository_open_bare(
+ 
+ 	repo->path_repository = git_buf_detach(&path);
+ 	GITERR_CHECK_ALLOC(repo->path_repository);
++	repo->commondir = git_buf_detach(&common_path);
++	GITERR_CHECK_ALLOC(repo->commondir);
+ 
+ 	/* of course we're bare! */
+ 	repo->is_bare = 1;
+@@ -673,7 +707,7 @@ int git_repository_open_ext(
+ {
+ 	int error;
+ 	git_buf path = GIT_BUF_INIT, parent = GIT_BUF_INIT,
+-		link_path = GIT_BUF_INIT;
++		link_path = GIT_BUF_INIT, common_path = GIT_BUF_INIT;
+ 	git_repository *repo;
+ 	git_config *config = NULL;
+ 
+@@ -684,7 +718,7 @@ int git_repository_open_ext(
+ 		*repo_ptr = NULL;
+ 
+ 	error = find_repo(
+-		&path, &parent, &link_path, start_path, flags, ceiling_dirs);
++		&path, &parent, &link_path, &common_path, start_path, flags, ceiling_dirs);
+ 
+ 	if (error < 0 || !repo_ptr)
+ 		return error;
+@@ -699,6 +733,10 @@ int git_repository_open_ext(
+ 		repo->path_gitlink = git_buf_detach(&link_path);
+ 		GITERR_CHECK_ALLOC(repo->path_gitlink);
+ 	}
++	if (common_path.size) {
++		repo->commondir = git_buf_detach(&common_path);
++		GITERR_CHECK_ALLOC(repo->commondir);
++	}
+ 
+ 	/*
+ 	 * We'd like to have the config, but git doesn't particularly
+@@ -765,7 +803,7 @@ int git_repository_discover(
+ 
+ 	git_buf_sanitize(out);
+ 
+-	return find_repo(out, NULL, NULL, start_path, flags, ceiling_dirs);
++	return find_repo(out, NULL, NULL, NULL, start_path, flags, ceiling_dirs);
+ }
+ 
+ static int load_config(
+@@ -920,7 +958,7 @@ int git_repository_odb__weakptr(git_odb **out, git_repository *repo)
+ 		git_buf odb_path = GIT_BUF_INIT;
+ 		git_odb *odb;
+ 
+-		if ((error = git_buf_joinpath(&odb_path, repo->path_repository, GIT_OBJECTS_DIR)) < 0)
++		if ((error = git_buf_joinpath(&odb_path, repo->commondir, GIT_OBJECTS_DIR)) < 0)
+ 			return error;
+ 
+ 		error = git_odb_open(&odb, odb_path.ptr);
+@@ -1848,7 +1886,8 @@ int git_repository_init_ext(
+ 	git_repository_init_options *opts)
+ {
+ 	int error;
+-	git_buf repo_path = GIT_BUF_INIT, wd_path = GIT_BUF_INIT;
++	git_buf repo_path = GIT_BUF_INIT, wd_path = GIT_BUF_INIT,
++		common_path = GIT_BUF_INIT;
+ 	const char *wd;
+ 
+ 	assert(out && given_repo && opts);
+@@ -1860,7 +1899,7 @@ int git_repository_init_ext(
+ 		goto cleanup;
+ 
+ 	wd = (opts->flags & GIT_REPOSITORY_INIT_BARE) ? NULL : git_buf_cstr(&wd_path);
+-	if (valid_repository_path(&repo_path)) {
++	if (valid_repository_path(&repo_path, &common_path)) {
+ 
+ 		if ((opts->flags & GIT_REPOSITORY_INIT_NO_REINIT) != 0) {
+ 			giterr_set(GITERR_REPOSITORY,
+@@ -1893,6 +1932,7 @@ int git_repository_init_ext(
+ 		error = repo_init_create_origin(*out, opts->origin_url);
+ 
+ cleanup:
++	git_buf_free(&common_path);
+ 	git_buf_free(&repo_path);
+ 	git_buf_free(&wd_path);
+ 
+diff --git a/src/repository.h b/src/repository.h
+index fd679b4..49eff60 100644
+--- a/src/repository.h
++++ b/src/repository.h
+@@ -128,6 +128,7 @@ struct git_repository {
+ 
+ 	char *path_repository;
+ 	char *path_gitlink;
++	char *commondir;
+ 	char *workdir;
+ 	char *namespace;
+ 
+diff --git a/tests/worktree/open.c b/tests/worktree/open.c
+new file mode 100644
+index 0000000..772f760
+--- /dev/null
++++ b/tests/worktree/open.c
+@@ -0,0 +1,60 @@
++#include "clar_libgit2.h"
++#include "worktree_helpers.h"
++
++#define WORKTREE_PARENT "submodules-worktree-parent"
++#define WORKTREE_CHILD "submodules-worktree-child"
++
++void test_worktree_open__repository(void)
++{
++	worktree_fixture fixture =
++		WORKTREE_FIXTURE_INIT("testrepo", "testrepo-worktree");
++	setup_fixture_worktree(&fixture);
++
++	cl_assert(git_repository_path(fixture.worktree) != NULL);
++	cl_assert(git_repository_workdir(fixture.worktree) != NULL);
++
++	cleanup_fixture_worktree(&fixture);
++}
++
++void test_worktree_open__repository_with_nonexistent_parent(void)
++{
++	git_repository *repo;
++
++	cl_fixture_sandbox("testrepo-worktree");
++	cl_git_pass(p_chdir("testrepo-worktree"));
++	cl_git_pass(cl_rename(".gitted", ".git"));
++	cl_git_pass(p_chdir(".."));
++
++	cl_git_fail(git_repository_open(&repo, "testrepo-worktree"));
++
++	cl_fixture_cleanup("testrepo-worktree");
++}
++
++void test_worktree_open__submodule_worktree_parent(void)
++{
++	worktree_fixture fixture =
++		WORKTREE_FIXTURE_INIT("submodules", WORKTREE_PARENT);
++	setup_fixture_worktree(&fixture);
++
++	cl_assert(git_repository_path(fixture.worktree) != NULL);
++	cl_assert(git_repository_workdir(fixture.worktree) != NULL);
++
++	cleanup_fixture_worktree(&fixture);
++}
++
++void test_worktree_open__submodule_worktree_child(void)
++{
++	worktree_fixture parent_fixture =
++		WORKTREE_FIXTURE_INIT("submodules", WORKTREE_PARENT);
++	worktree_fixture child_fixture =
++		WORKTREE_FIXTURE_INIT(NULL, WORKTREE_CHILD);
++
++	setup_fixture_worktree(&parent_fixture);
++	cl_git_pass(p_rename(
++		"submodules/testrepo/.gitted",
++		"submodules/testrepo/.git"));
++	setup_fixture_worktree(&child_fixture);
++
++	cleanup_fixture_worktree(&child_fixture);
++	cleanup_fixture_worktree(&parent_fixture);
++}
+-- 
+2.9.0.windows.1
+

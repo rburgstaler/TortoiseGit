@@ -1,0 +1,130 @@
+From 57ac8354d48f1d6153583c05a419404644e1d768 Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Thu, 15 Oct 2015 15:58:05 +0200
+Subject: [PATCH 1005/1024] repository: introduce is_worktree variable
+
+---
+ include/git2/repository.h |  8 ++++++++
+ src/repository.c          | 11 +++++++++++
+ src/repository.h          |  1 +
+ tests/worktree/open.c     | 11 +++++++++++
+ 4 files changed, 31 insertions(+)
+
+diff --git a/include/git2/repository.h b/include/git2/repository.h
+index 3d70d1b..ea54e8c 100644
+--- a/include/git2/repository.h
++++ b/include/git2/repository.h
+@@ -421,6 +421,14 @@ GIT_EXTERN(int) git_repository_set_workdir(
+ GIT_EXTERN(int) git_repository_is_bare(git_repository *repo);
+ 
+ /**
++ * Check if a repository is a linked work tree
++ *
++ * @param repo Repo to test
++ * @return 1 if the repository is a linked work tree, 0 otherwise.
++ */
++GIT_EXTERN(int) git_repository_is_worktree(git_repository *repo);
++
++/**
+  * Get the configuration file for this repository.
+  *
+  * If a configuration file has not been set, the default
+diff --git a/src/repository.c b/src/repository.c
+index f08dd9e..bcdd57d 100644
+--- a/src/repository.c
++++ b/src/repository.c
+@@ -224,6 +224,7 @@ int git_repository_new(git_repository **out)
+ 	GITERR_CHECK_ALLOC(repo);
+ 
+ 	repo->is_bare = 1;
++	repo->is_worktree = 0;
+ 
+ 	return 0;
+ }
+@@ -527,6 +528,7 @@ int git_repository_open_bare(
+ 
+ 	/* of course we're bare! */
+ 	repo->is_bare = 1;
++	repo->is_worktree = 0;
+ 	repo->workdir = NULL;
+ 
+ 	*repo_ptr = repo;
+@@ -738,6 +740,9 @@ int git_repository_open_ext(
+ 		GITERR_CHECK_ALLOC(repo->commondir);
+ 	}
+ 
++	if (repo->path_gitlink && repo->commondir && strcmp(repo->path_gitlink, repo->commondir))
++		repo->is_worktree = 1;
++
+ 	/*
+ 	 * We'd like to have the config, but git doesn't particularly
+ 	 * care if it's not there, so we need to deal with that.
+@@ -2105,6 +2110,12 @@ int git_repository_is_bare(git_repository *repo)
+ 	return repo->is_bare;
+ }
+ 
++int git_repository_is_worktree(git_repository *repo)
++{
++	assert(repo);
++	return repo->is_worktree;
++}
++
+ int git_repository_set_bare(git_repository *repo)
+ {
+ 	int error;
+diff --git a/src/repository.h b/src/repository.h
+index 49eff60..c8e89af 100644
+--- a/src/repository.h
++++ b/src/repository.h
+@@ -138,6 +138,7 @@ struct git_repository {
+ 	git_array_t(git_buf) reserved_names;
+ 
+ 	unsigned is_bare:1;
++	unsigned is_worktree:1;
+ 
+ 	unsigned int lru_counter;
+ 
+diff --git a/tests/worktree/open.c b/tests/worktree/open.c
+index 772f760..54a8af4 100644
+--- a/tests/worktree/open.c
++++ b/tests/worktree/open.c
+@@ -1,4 +1,5 @@
+ #include "clar_libgit2.h"
++#include "repository.h"
+ #include "worktree_helpers.h"
+ 
+ #define WORKTREE_PARENT "submodules-worktree-parent"
+@@ -13,6 +14,9 @@ void test_worktree_open__repository(void)
+ 	cl_assert(git_repository_path(fixture.worktree) != NULL);
+ 	cl_assert(git_repository_workdir(fixture.worktree) != NULL);
+ 
++	cl_assert(!fixture.repo->is_worktree);
++	cl_assert(fixture.worktree->is_worktree);
++
+ 	cleanup_fixture_worktree(&fixture);
+ }
+ 
+@@ -39,6 +43,9 @@ void test_worktree_open__submodule_worktree_parent(void)
+ 	cl_assert(git_repository_path(fixture.worktree) != NULL);
+ 	cl_assert(git_repository_workdir(fixture.worktree) != NULL);
+ 
++	cl_assert(!fixture.repo->is_worktree);
++	cl_assert(fixture.worktree->is_worktree);
++
+ 	cleanup_fixture_worktree(&fixture);
+ }
+ 
+@@ -55,6 +62,10 @@ void test_worktree_open__submodule_worktree_child(void)
+ 		"submodules/testrepo/.git"));
+ 	setup_fixture_worktree(&child_fixture);
+ 
++	cl_assert(!parent_fixture.repo->is_worktree);
++	cl_assert(parent_fixture.worktree->is_worktree);
++	cl_assert(child_fixture.worktree->is_worktree);
++
+ 	cleanup_fixture_worktree(&child_fixture);
+ 	cleanup_fixture_worktree(&parent_fixture);
+ }
+-- 
+2.9.0.windows.1
+

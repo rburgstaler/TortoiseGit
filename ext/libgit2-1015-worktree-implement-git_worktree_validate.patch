@@ -1,0 +1,157 @@
+From f02dc0454585ae27d103a6bdb9ad9434e26126cb Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Wed, 21 Oct 2015 13:49:55 +0200
+Subject: [PATCH 1015/1024] worktree: implement `git_worktree_validate`
+
+Add a new function that checks wether a given `struct
+git_worktree` is valid. The validation includes checking if the
+gitdir, parent directory and common directory are present.
+---
+ include/git2/errors.h     |  1 +
+ include/git2/worktree.h   | 12 ++++++++++++
+ src/worktree.c            | 38 +++++++++++++++++++++++++++++++++++
+ tests/worktree/worktree.c | 50 +++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 101 insertions(+)
+
+diff --git a/include/git2/errors.h b/include/git2/errors.h
+index e959ffd..deda0ed 100644
+--- a/include/git2/errors.h
++++ b/include/git2/errors.h
+@@ -100,6 +100,7 @@ typedef enum {
+ 	GITERR_REBASE,
+ 	GITERR_FILESYSTEM,
+ 	GITERR_PATCH,
++	GITERR_WORKTREE,
+ } git_error_t;
+ 
+ /**
+diff --git a/include/git2/worktree.h b/include/git2/worktree.h
+index 10c25db..dc0cd62 100644
+--- a/include/git2/worktree.h
++++ b/include/git2/worktree.h
+@@ -61,6 +61,18 @@ GIT_EXTERN(int) git_worktree_open(git_repository **out, git_worktree *wt);
+  */
+ GIT_EXTERN(void) git_worktree_free(git_worktree *wt);
+ 
++/**
++ * Check if worktree is valid
++ *
++ * A valid worktree requires both the git data structures inside
++ * the linked parent repository and the linked working copy to be
++ * present.
++ *
++ * @param wt Worktree to check
++ * @return 0 when worktree is valid, error-code otherwise
++ */
++GIT_EXTERN(int) git_worktree_validate(const git_worktree *wt);
++
+ /** @} */
+ GIT_END_DECL
+ #endif
+diff --git a/src/worktree.c b/src/worktree.c
+index b53dda4..f660099 100644
+--- a/src/worktree.c
++++ b/src/worktree.c
+@@ -180,3 +180,41 @@ void git_worktree_free(git_worktree *wt)
+ 	git__free(wt->name);
+ 	git__free(wt);
+ }
++
++int git_worktree_validate(const git_worktree *wt)
++{
++	git_buf buf = GIT_BUF_INIT;
++	int err = 0;
++
++	assert(wt);
++
++	git_buf_puts(&buf, wt->gitdir_path);
++	if (!is_worktree_dir(&buf)) {
++		giterr_set(GITERR_WORKTREE,
++			"Worktree gitdir ('%s') is not valid",
++			wt->gitlink_path);
++		err = -1;
++		goto out;
++	}
++
++	if (!git_path_exists(wt->parent_path)) {
++		giterr_set(GITERR_WORKTREE,
++			"Worktree parent directory ('%s') does not exist ",
++			wt->parent_path);
++		err = -2;
++		goto out;
++	}
++
++	if (!git_path_exists(wt->commondir_path)) {
++		giterr_set(GITERR_WORKTREE,
++			"Worktree common directory ('%s') does not exist ",
++			wt->commondir_path);
++		err = -3;
++		goto out;
++	}
++
++out:
++	git_buf_free(&buf);
++
++	return err;
++}
+diff --git a/tests/worktree/worktree.c b/tests/worktree/worktree.c
+index b943408..1750b9c 100644
+--- a/tests/worktree/worktree.c
++++ b/tests/worktree/worktree.c
+@@ -203,3 +203,53 @@ void test_worktree_worktree__open_invalid_parent(void)
+ 	git_buf_free(&buf);
+ 	git_worktree_free(wt);
+ }
++
++void test_worktree_worktree__validate(void)
++{
++	git_worktree *wt;
++
++	cl_git_pass(git_worktree_lookup(&wt, fixture.repo, "testrepo-worktree"));
++	cl_git_pass(git_worktree_validate(wt));
++
++	git_worktree_free(wt);
++}
++
++void test_worktree_worktree__validate_invalid_commondir(void)
++{
++	git_worktree *wt;
++
++	cl_git_pass(git_worktree_lookup(&wt, fixture.repo, "testrepo-worktree"));
++	git__free(wt->commondir_path);
++	wt->commondir_path = "/path/to/invalid/commondir";
++
++	cl_git_fail(git_worktree_validate(wt));
++
++	wt->commondir_path = NULL;
++	git_worktree_free(wt);
++}
++
++void test_worktree_worktree__validate_invalid_gitdir(void)
++{
++	git_worktree *wt;
++
++	cl_git_pass(git_worktree_lookup(&wt, fixture.repo, "testrepo-worktree"));
++	git__free(wt->gitdir_path);
++	wt->gitdir_path = "/path/to/invalid/gitdir";
++	cl_git_fail(git_worktree_validate(wt));
++
++	wt->gitdir_path = NULL;
++	git_worktree_free(wt);
++}
++
++void test_worktree_worktree__validate_invalid_parent(void)
++{
++	git_worktree *wt;
++
++	cl_git_pass(git_worktree_lookup(&wt, fixture.repo, "testrepo-worktree"));
++	git__free(wt->parent_path);
++	wt->parent_path = "/path/to/invalid/parent";
++	cl_git_fail(git_worktree_validate(wt));
++
++	wt->parent_path = NULL;
++	git_worktree_free(wt);
++}
+-- 
+2.9.0.windows.1
+

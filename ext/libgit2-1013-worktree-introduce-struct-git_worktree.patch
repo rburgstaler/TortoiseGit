@@ -1,0 +1,248 @@
+From 90f09396d05c59b720d44eca9021e319ac659599 Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Wed, 21 Oct 2015 12:02:31 +0200
+Subject: [PATCH 1013/1024] worktree: introduce `struct git_worktree`
+
+Introduce a new `struct git_worktree`, which holds information
+about a possible working tree connected to a repository.
+Introduce functions to allow opening working trees for a
+repository.
+---
+ include/git2/types.h      |  3 ++
+ include/git2/worktree.h   | 17 +++++++++
+ src/worktree.c            | 89 +++++++++++++++++++++++++++++++++++++++++++++++
+ src/worktree.h            | 31 +++++++++++++++++
+ tests/worktree/worktree.c | 28 ++++++++++++++-
+ 5 files changed, 167 insertions(+), 1 deletion(-)
+ create mode 100644 src/worktree.h
+
+diff --git a/include/git2/types.h b/include/git2/types.h
+index 6f41014..dfdaa29 100644
+--- a/include/git2/types.h
++++ b/include/git2/types.h
+@@ -104,6 +104,9 @@ typedef struct git_refdb_backend git_refdb_backend;
+  */
+ typedef struct git_repository git_repository;
+ 
++/** Representation of a working tree */
++typedef struct git_worktree git_worktree;
++
+ /** Representation of a generic object in a repository */
+ typedef struct git_object git_object;
+ 
+diff --git a/include/git2/worktree.h b/include/git2/worktree.h
+index c09fa32..8313265 100644
+--- a/include/git2/worktree.h
++++ b/include/git2/worktree.h
+@@ -32,6 +32,23 @@ GIT_BEGIN_DECL
+  */
+ GIT_EXTERN(int) git_worktree_list(git_strarray *out, git_repository *repo);
+ 
++/**
++ * Lookup a working tree by its name for a given repository
++ *
++ * @param out Output pointer to looked up worktree or `NULL`
++ * @param repo The repository containing worktrees
++ * @param name Name of the working tree to look up
++ * @return 0 or an error code
++ */
++GIT_EXTERN(int) git_worktree_lookup(git_worktree **out, git_repository *repo, const char *name);
++
++/**
++ * Free a previously allocated worktree
++ *
++ * @param wt worktree handle to close. If NULL nothing occurs.
++ */
++GIT_EXTERN(void) git_worktree_free(git_worktree *wt);
++
+ /** @} */
+ GIT_END_DECL
+ #endif
+diff --git a/src/worktree.c b/src/worktree.c
+index 28d895d..a0e5d93 100644
+--- a/src/worktree.c
++++ b/src/worktree.c
+@@ -9,6 +9,7 @@
+ 
+ #include "common.h"
+ #include "repository.h"
++#include "worktree.h"
+ 
+ static bool is_worktree_dir(git_buf *dir)
+ {
+@@ -56,3 +57,91 @@ exit:
+ 
+ 	return error;
+ }
++
++static char *read_link(const char *base, const char *file)
++{
++	git_buf path = GIT_BUF_INIT, buf = GIT_BUF_INIT;
++
++	assert(base && file);
++
++	if (git_buf_joinpath(&path, base, file) < 0)
++		goto err;
++	if (git_futils_readbuffer(&buf, path.ptr) < 0)
++		goto err;
++	git_buf_free(&path);
++
++	git_buf_rtrim(&buf);
++
++	if (!git_path_is_relative(buf.ptr))
++		return git_buf_detach(&buf);
++
++	if (git_buf_sets(&path, base) < 0)
++		goto err;
++	if (git_path_apply_relative(&path, buf.ptr) < 0)
++		goto err;
++	git_buf_free(&buf);
++
++	return git_buf_detach(&path);
++
++err:
++	git_buf_free(&buf);
++	git_buf_free(&path);
++
++	return NULL;
++}
++
++int git_worktree_lookup(git_worktree **out, git_repository *repo, const char *name)
++{
++	git_buf path = GIT_BUF_INIT;
++	git_worktree *wt = NULL;
++	int error;
++
++	assert(repo && name);
++
++	*out = NULL;
++
++	if ((error = git_buf_printf(&path, "%s/worktrees/%s", repo->commondir, name)) < 0)
++		goto out;
++
++	if (!is_worktree_dir(&path)) {
++		error = -1;
++		goto out;
++	}
++
++	if ((wt = git__malloc(sizeof(struct git_repository))) == NULL) {
++		error = -1;
++		goto out;
++	}
++
++	if ((wt->name = git__strdup(name)) == NULL
++	    || (wt->commondir_path = read_link(path.ptr, "commondir")) == NULL
++	    || (wt->gitlink_path = read_link(path.ptr, "gitdir")) == NULL
++	    || (wt->parent_path = git__strdup(git_repository_path(repo))) == NULL) {
++		error = -1;
++		goto out;
++	}
++	wt->gitdir_path = git_buf_detach(&path);
++
++	(*out) = wt;
++
++out:
++	git_buf_free(&path);
++
++	if (error)
++		git_worktree_free(wt);
++
++	return error;
++}
++
++void git_worktree_free(git_worktree *wt)
++{
++	if (!wt)
++		return;
++
++	git__free(wt->commondir_path);
++	git__free(wt->gitlink_path);
++	git__free(wt->gitdir_path);
++	git__free(wt->parent_path);
++	git__free(wt->name);
++	git__free(wt);
++}
+diff --git a/src/worktree.h b/src/worktree.h
+new file mode 100644
+index 0000000..0e1666c
+--- /dev/null
++++ b/src/worktree.h
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (C) the libgit2 contributors. All rights reserved.
++ *
++ * This file is part of libgit2, distributed under the GNU GPL v2 with
++ * a Linking Exception. For full terms see the included COPYING file.
++ */
++#ifndef INCLUDE_worktree_h__
++#define INCLUDE_worktree_h__
++
++#include "git2/common.h"
++#include "git2/worktree.h"
++
++struct git_worktree {
++	/* Name of the working tree. This is the name of the
++	 * containing directory in the `$PARENT/.git/worktrees/`
++	 * directory. */
++	char *name;
++
++	/* Path to the .git file in the working tree's repository */
++	char *gitlink_path;
++	/* Path to the .git directory inside the parent's
++	 * worktrees directory */
++	char *gitdir_path;
++	/* Path to the common directory contained in the parent
++	 * repository */
++	char *commondir_path;
++	/* Path to the parent's .git directory */
++	char *parent_path;
++};
++
++#endif
+diff --git a/tests/worktree/worktree.c b/tests/worktree/worktree.c
+index 3acae88..403ed9a 100644
+--- a/tests/worktree/worktree.c
++++ b/tests/worktree/worktree.c
+@@ -1,8 +1,8 @@
+ #include "clar_libgit2.h"
+ #include "worktree_helpers.h"
+ 
+-#include "git2/worktree.h"
+ #include "repository.h"
++#include "worktree.h"
+ 
+ #define COMMON_REPO "testrepo"
+ #define WORKTREE_REPO "testrepo-worktree"
+@@ -105,3 +105,29 @@ void test_worktree_worktree__list_without_worktrees(void)
+ 
+ 	git_repository_free(repo);
+ }
++
++void test_worktree_worktree__lookup(void)
++{
++	git_worktree *wt;
++	git_buf gitdir_path = GIT_BUF_INIT;
++
++	cl_git_pass(git_worktree_lookup(&wt, fixture.repo, "testrepo-worktree"));
++
++	git_buf_printf(&gitdir_path, "%s/worktrees/%s", fixture.repo->commondir, "testrepo-worktree");
++
++	cl_assert(git_path_equal(wt->gitdir_path, gitdir_path.ptr));
++	cl_assert(git_path_equal(wt->parent_path, fixture.repo->path_repository));
++	cl_assert(git_path_equal(wt->gitlink_path, fixture.worktree->path_gitlink));
++	cl_assert(git_path_equal(wt->commondir_path, fixture.repo->commondir));
++
++	git_buf_free(&gitdir_path);
++	git_worktree_free(wt);
++}
++
++void test_worktree_worktree__lookup_nonexistent_worktree(void)
++{
++	git_worktree *wt;
++
++	cl_git_fail(git_worktree_lookup(&wt, fixture.repo, "nonexistent"));
++	cl_assert_equal_p(wt, NULL);
++}
+-- 
+2.9.0.windows.1
+

@@ -1,0 +1,206 @@
+From 1ba46787c63c33e13fb0d066c8f49a643650dd23 Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Wed, 11 Nov 2015 10:54:08 +0100
+Subject: [PATCH 1000/1024] tests: add worktree test data
+
+---
+ tests/iterator/workdir.c                                  |   3 ++-
+ tests/refs/list.c                                         |   4 ++--
+ tests/resources/testrepo-worktree/.gitted                 | Bin 0 -> 53 bytes
+ tests/resources/testrepo-worktree/README                  | Bin 0 -> 10 bytes
+ tests/resources/testrepo-worktree/branch_file.txt         | Bin 0 -> 8 bytes
+ tests/resources/testrepo-worktree/link_to_new.txt         |   1 +
+ tests/resources/testrepo-worktree/new.txt                 | Bin 0 -> 12 bytes
+ .../testrepo/.gitted/logs/refs/heads/testrepo-worktree    | Bin 0 -> 156 bytes
+ .../testrepo/.gitted/refs/heads/testrepo-worktree         | Bin 0 -> 41 bytes
+ .../testrepo/.gitted/worktrees/testrepo-worktree/HEAD     | Bin 0 -> 34 bytes
+ .../.gitted/worktrees/testrepo-worktree/commondir         | Bin 0 -> 6 bytes
+ .../testrepo/.gitted/worktrees/testrepo-worktree/gitdir   | Bin 0 -> 35 bytes
+ .../testrepo/.gitted/worktrees/testrepo-worktree/index    | Bin 0 -> 369 bytes
+ .../.gitted/worktrees/testrepo-worktree/logs/HEAD         | Bin 0 -> 214 bytes
+ 14 files changed, 5 insertions(+), 3 deletions(-)
+ create mode 100644 tests/resources/testrepo-worktree/.gitted
+ create mode 100644 tests/resources/testrepo-worktree/README
+ create mode 100644 tests/resources/testrepo-worktree/branch_file.txt
+ create mode 120000 tests/resources/testrepo-worktree/link_to_new.txt
+ create mode 100644 tests/resources/testrepo-worktree/new.txt
+ create mode 100644 tests/resources/testrepo/.gitted/logs/refs/heads/testrepo-worktree
+ create mode 100644 tests/resources/testrepo/.gitted/refs/heads/testrepo-worktree
+ create mode 100644 tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/HEAD
+ create mode 100644 tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/commondir
+ create mode 100644 tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/gitdir
+ create mode 100644 tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/index
+ create mode 100644 tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/logs/HEAD
+
+diff --git a/tests/iterator/workdir.c b/tests/iterator/workdir.c
+index 28fcc0d..165cca5 100644
+--- a/tests/iterator/workdir.c
++++ b/tests/iterator/workdir.c
+@@ -616,6 +616,7 @@ void test_iterator_workdir__filesystem2(void)
+ 		"heads/packed-test",
+ 		"heads/subtrees",
+ 		"heads/test",
++		"heads/testrepo-worktree",
+ 		"tags/e90810b",
+ 		"tags/foo/bar",
+ 		"tags/foo/foo/bar",
+@@ -628,7 +629,7 @@ void test_iterator_workdir__filesystem2(void)
+ 
+ 	cl_git_pass(git_iterator_for_filesystem(
+ 		&i, "testrepo/.git/refs", NULL));
+-	expect_iterator_items(i, 13, expect_base, 13, expect_base);
++	expect_iterator_items(i, 14, expect_base, 14, expect_base);
+ 	git_iterator_free(i);
+ }
+ 
+diff --git a/tests/refs/list.c b/tests/refs/list.c
+index 374943b..b4101ba 100644
+--- a/tests/refs/list.c
++++ b/tests/refs/list.c
+@@ -36,7 +36,7 @@ void test_refs_list__all(void)
+ 	/* We have exactly 12 refs in total if we include the packed ones:
+ 	 * there is a reference that exists both in the packfile and as
+ 	 * loose, but we only list it once */
+-	cl_assert_equal_i((int)ref_list.count, 15);
++	cl_assert_equal_i((int)ref_list.count, 16);
+ 
+ 	git_strarray_free(&ref_list);
+ }
+@@ -51,7 +51,7 @@ void test_refs_list__do_not_retrieve_references_which_name_end_with_a_lock_exten
+ 		"144344043ba4d4a405da03de3844aa829ae8be0e\n");
+ 
+ 	cl_git_pass(git_reference_list(&ref_list, g_repo));
+-	cl_assert_equal_i((int)ref_list.count, 15);
++	cl_assert_equal_i((int)ref_list.count, 16);
+ 
+ 	git_strarray_free(&ref_list);
+ }
+diff --git a/tests/resources/testrepo-worktree/.gitted b/tests/resources/testrepo-worktree/.gitted
+new file mode 100644
+index 0000000000000000000000000000000000000000..fe4556a92e68ed14b7ac05eb465bcee87ec11fba
+GIT binary patch
+literal 53
+tcmYe#EJ?{MvQp5~(=SOaE-6Ya$k*3P&n(d|&o9aba#M@p;<_*)E&vVs6XXB@
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/testrepo-worktree/README b/tests/resources/testrepo-worktree/README
+new file mode 100644
+index 0000000000000000000000000000000000000000..a8233120f6ad708f843d861ce2b7228ec4e3dec6
+GIT binary patch
+literal 10
+Rcmc~utyCz<NG(d`0ss`v1Bn0t
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/testrepo-worktree/branch_file.txt b/tests/resources/testrepo-worktree/branch_file.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..3697d64be941a53d4ae8f6a271e4e3fa56b022cc
+GIT binary patch
+literal 8
+Pcmd1E<VvbcRpbHy3#<Z1
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/testrepo-worktree/link_to_new.txt b/tests/resources/testrepo-worktree/link_to_new.txt
+new file mode 120000
+index 0000000..c0528fd
+--- /dev/null
++++ b/tests/resources/testrepo-worktree/link_to_new.txt
+@@ -0,0 +1 @@
++new.txt
+\ No newline at end of file
+diff --git a/tests/resources/testrepo-worktree/new.txt b/tests/resources/testrepo-worktree/new.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..a71586c1dfe8a71c6cbf6c129f404c5642ff31bd
+GIT binary patch
+literal 12
+Tcmd0;RLDy$S4hjuN#z0n99#q&
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/testrepo/.gitted/logs/refs/heads/testrepo-worktree b/tests/resources/testrepo/.gitted/logs/refs/heads/testrepo-worktree
+new file mode 100644
+index 0000000000000000000000000000000000000000..93ab5f06f2997efb5f10d9cb95c344aefc911bf0
+GIT binary patch
+literal 156
+zcma*UQ3}E^3;@t?Jw^TniEUaN5m8j|Q}6^?m#{K6N7wt~6?_lzKY+|8on$Yp!af8}
+z!KLhumSR*-m^eE%gSWI=@(7=%WgevV4bIDYUB-1^rVAX193`UYVTTTJ(^Z-CaDsbP
+PY1)I;?*y;s?Xmp<!eJ@1
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/testrepo/.gitted/refs/heads/testrepo-worktree b/tests/resources/testrepo/.gitted/refs/heads/testrepo-worktree
+new file mode 100644
+index 0000000000000000000000000000000000000000..f31fe781bda0f544e89eca9e424e06cd24db8dd0
+GIT binary patch
+literal 41
+ucmV~$!4Uu;2m`Rc({Lc#j)NTCe*_aFRj)dVQ;bX^9qm^*XJQ-JKGOQ{g$o=2
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/HEAD b/tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/HEAD
+new file mode 100644
+index 0000000000000000000000000000000000000000..1b8637e32303ea9ae8f06cc27f2a683efa2e1f6a
+GIT binary patch
+literal 34
+ncmXR)O|w!cN=+-)&qz&7Db_DZEiNfaEy&j`&o9abvQoJK-S-U3
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/commondir b/tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/commondir
+new file mode 100644
+index 0000000000000000000000000000000000000000..aab0408ceca61b98818f783c76b074312fd5cd80
+GIT binary patch
+literal 6
+NcmdPX)7R7E0ssT70P+9;
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/gitdir b/tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/gitdir
+new file mode 100644
+index 0000000000000000000000000000000000000000..0d37a5792e80ea66ef6734c8859d2b739e5beddf
+GIT binary patch
+literal 35
+icmdPX)7OKclGNgoqSS(X-SYgRY#=LDUoSnggbM($u?p@0
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/index b/tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/index
+new file mode 100644
+index 0000000000000000000000000000000000000000..41141906ec8fb3fa59ce0e82bfc78857bc5871b1
+GIT binary patch
+literal 369
+zcmZ?q402{*U|<4bme5}l-m~oN&4bYl4F8xI;utv?7#f!_FfhM>U<R%g%7zNx))w@)
+z*tW?$+OE`h<ng^@3~WKJjxN5gKyw&i`e8KG98NTIILxMB^M2{L)Yj|8w?&0d9{&p4
+zpmc_TKdC4&FF7MVEi)%oucV>`w|QI)3=4p=aCfmE2<pFfW=0Q}!#VDU(g!E~={;(a
+z$H1SHnU@`3k{_R!T8`g5ZZ!AtEEjD%c>l$6nVkJOLh~Jb!kqpa?qy&{m=hA@3i7Wc
+zgNcFxm+Rfu{JXxLJ6aAq?BZi754yRb^;+YPi$SX%OHa&gs*EdjW2#W%@F@iV+^&ba
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/logs/HEAD b/tests/resources/testrepo/.gitted/worktrees/testrepo-worktree/logs/HEAD
+new file mode 100644
+index 0000000000000000000000000000000000000000..3bede502ee05ea8314e9e0244b9f43d1f4c6eda8
+GIT binary patch
+literal 214
+zcma*g%?$z}5J2IxRxx*@8Tk`7##n-h6(9~SAuI$&ZC^{++dF*8L+7G@_#nL_@1)kw
+zYGH#oMQaR6h1LZ@F#@iIH_ttV40ooq%)UPv&TU*<9*0yea8ybttCW$jLxH#nGlg8=
+cJVB|Sw7ekpTGsEl0@L75t?s|I=YP@m2NSJ8JOBUy
+
+literal 0
+HcmV?d00001
+
+-- 
+2.9.0.windows.1
+

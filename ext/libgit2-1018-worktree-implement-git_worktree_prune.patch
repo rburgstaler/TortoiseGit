@@ -1,0 +1,201 @@
+From acac278c284745a8e86a15ca3ed5b47e237062c6 Mon Sep 17 00:00:00 2001
+From: Patrick Steinhardt <ps@pks.im>
+Date: Wed, 21 Oct 2015 13:53:18 +0200
+Subject: [PATCH 1018/1024] worktree: implement `git_worktree_prune`
+
+Implement the `git_worktree_prune` function. This function can be
+used to delete working trees from a repository. According to the
+flags passed to it, it can either delete the working tree's
+gitdir only or both gitdir and the working directory.
+---
+ include/git2/worktree.h   | 26 +++++++++++++++++
+ src/worktree.c            | 71 +++++++++++++++++++++++++++++++++++++++++++++++
+ tests/worktree/worktree.c | 59 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 156 insertions(+)
+
+diff --git a/include/git2/worktree.h b/include/git2/worktree.h
+index 860225e..2d818bc 100644
+--- a/include/git2/worktree.h
++++ b/include/git2/worktree.h
+@@ -124,6 +124,32 @@ GIT_EXTERN(int) git_worktree_unlock(git_worktree *wt);
+  */
+ GIT_EXTERN(int) git_worktree_is_locked(git_buf *reason, const git_worktree *wt);
+ 
++enum {
++	/* Actually remove files */
++	GIT_WORKTREE_PRUNE_FORCE = 1u << 0,
++	/* Prune working tree even if working tree is valid */
++	GIT_WORKTREE_PRUNE_VALID = 1u << 1,
++	/* Prune working tree even if it is locked */
++	GIT_WORKTREE_PRUNE_LOCKED = 1u << 2,
++	/* Prune checked out working tree */
++	GIT_WORKTREE_PRUNE_WORKING_TREE = 1u << 3,
++};
++
++/**
++ * Prune working tree
++ *
++ * Prune the working tree, that is remove the git data
++ * structures. By default, working trees having a connected
++ * working copy present will not be deleted. This behavior can be
++ * changed by passing the flag `GIT_WORKTREE_PRUNE_FORCE`, which
++ * will also cause the working tree to be deleted.
++ *
++ * @param wt Worktree to prune
++ * @param flags Flags from `GIT_WORKTREE_PRUNE`
++ * @return 0 or an error code
++ */
++GIT_EXTERN(int) git_worktree_prune(git_worktree *wt, unsigned flags);
++
+ /** @} */
+ GIT_END_DECL
+ #endif
+diff --git a/src/worktree.c b/src/worktree.c
+index baaa86a..a875fbd 100644
+--- a/src/worktree.c
++++ b/src/worktree.c
+@@ -386,3 +386,74 @@ out:
+ 
+ 	return ret;
+ }
++
++int git_worktree_prune(git_worktree *wt, unsigned flags)
++{
++	git_buf reason = GIT_BUF_INIT, path = GIT_BUF_INIT;
++	char *wtpath;
++	int err;
++
++	if ((flags & GIT_WORKTREE_PRUNE_LOCKED) == 0 &&
++		git_worktree_is_locked(&reason, wt))
++	{
++		if (!reason.size)
++			git_buf_attach_notowned(&reason, "no reason given", 15);
++		giterr_set(GITERR_WORKTREE, "Not pruning locked working tree: '%s'", reason.ptr);
++
++		err = -1;
++		goto out;
++	}
++
++	if ((flags & GIT_WORKTREE_PRUNE_VALID) == 0 &&
++		git_worktree_validate(wt))
++	{
++		giterr_set(GITERR_WORKTREE, "Not pruning valid working tree");
++		err = -1;
++		goto out;
++	}
++
++	if ((flags & GIT_WORKTREE_PRUNE_FORCE) == 0)
++	{
++		giterr_set(GITERR_WORKTREE, "Not pruning without GIT_WORKTREE_PRUNE_FORCE");
++		err = -1;
++		goto out;
++	}
++
++	/* Delete gitdir in parent repository */
++	if ((err = git_buf_printf(&path, "%s/worktrees/%s", wt->parent_path, wt->name)) < 0)
++		goto out;
++	if (!git_path_exists(path.ptr))
++	{
++		giterr_set(GITERR_WORKTREE, "Worktree gitdir '%s' does not exist", path.ptr);
++		err = -1;
++		goto out;
++	}
++	if ((err = git_futils_rmdir_r(path.ptr, NULL, GIT_RMDIR_REMOVE_FILES)) < 0)
++		goto out;
++
++	/* Skip deletion of the actual working tree if it does
++	 * not exist or deletion was not requested */
++	if ((flags & GIT_WORKTREE_PRUNE_WORKING_TREE) == 0 ||
++		!git_path_exists(wt->gitlink_path))
++	{
++		goto out;
++	}
++
++	if ((wtpath = git_path_dirname(wt->gitlink_path)) == NULL)
++		goto out;
++	git_buf_attach(&path, wtpath, 0);
++	if (!git_path_exists(path.ptr))
++	{
++		giterr_set(GITERR_WORKTREE, "Working tree '%s' does not exist", path.ptr);
++		err = -1;
++		goto out;
++	}
++	if ((err = git_futils_rmdir_r(path.ptr, NULL, GIT_RMDIR_REMOVE_FILES)) < 0)
++		goto out;
++
++out:
++	git_buf_free(&reason);
++	git_buf_free(&path);
++
++	return err;
++}
+diff --git a/tests/worktree/worktree.c b/tests/worktree/worktree.c
+index f19004b..44dd9a8 100644
+--- a/tests/worktree/worktree.c
++++ b/tests/worktree/worktree.c
+@@ -375,3 +375,62 @@ void test_worktree_worktree__unlock_locked_worktree(void)
+ 
+ 	git_worktree_free(wt);
+ }
++
++void test_worktree_worktree__prune_unforced(void)
++{
++	git_worktree *wt;
++	git_repository *repo;
++
++	cl_git_pass(git_worktree_lookup(&wt, fixture.repo, "testrepo-worktree"));
++	cl_git_fail(git_worktree_prune(wt, 0));
++	cl_git_fail(git_worktree_prune(wt, ~GIT_WORKTREE_PRUNE_FORCE));
++
++	/* Assert the repository is still valid */
++	cl_git_pass(git_worktree_open(&repo, wt));
++
++	git_worktree_free(wt);
++	git_repository_free(repo);
++}
++
++void test_worktree_worktree__prune_locked(void)
++{
++	git_worktree *wt;
++	git_repository *repo;
++
++	cl_git_pass(git_worktree_lookup(&wt, fixture.repo, "testrepo-worktree"));
++	cl_git_pass(git_worktree_lock(wt, NULL));
++	cl_git_fail(git_worktree_prune(wt, GIT_WORKTREE_PRUNE_FORCE));
++	cl_git_fail(git_worktree_prune(wt, ~GIT_WORKTREE_PRUNE_LOCKED));
++
++	/* Assert the repository is still valid */
++	cl_git_pass(git_worktree_open(&repo, wt));
++
++	git_worktree_free(wt);
++	git_repository_free(repo);
++}
++
++void test_worktree_worktree__prune_gitdir(void)
++{
++	git_worktree *wt;
++
++	cl_git_pass(git_worktree_lookup(&wt, fixture.repo, "testrepo-worktree"));
++	cl_git_pass(git_worktree_prune(wt, GIT_WORKTREE_PRUNE_FORCE));
++
++	cl_assert(!git_path_exists(wt->gitdir_path));
++	cl_assert(git_path_exists(wt->gitlink_path));
++
++	git_worktree_free(wt);
++}
++
++void test_worktree_worktree__prune_both(void)
++{
++	git_worktree *wt;
++
++	cl_git_pass(git_worktree_lookup(&wt, fixture.repo, "testrepo-worktree"));
++	cl_git_pass(git_worktree_prune(wt, GIT_WORKTREE_PRUNE_FORCE | GIT_WORKTREE_PRUNE_WORKING_TREE));
++
++	cl_assert(!git_path_exists(wt->gitdir_path));
++	cl_assert(!git_path_exists(wt->gitlink_path));
++
++	git_worktree_free(wt);
++}
+-- 
+2.9.0.windows.1
+
